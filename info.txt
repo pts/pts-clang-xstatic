@@ -1,0 +1,14 @@
+Modifications of the clang+llvm-3.3-i386-debian6.tar.bz2 download:
+
+* bin/clang renamed to bin/clang.bin
+* /proc/self/exe in bin/clang.bin changed to /proc/self/exE
+* lib/clang/cur -> 3.3 symlink created
+* added xstatic from
+  http://www.uclibc.org/downloads/binaries/0.9.30.1/cross-compiler-i686.tar.bz2
+  2009-04-11
+  gcc-4.1.2 (only ld added)
+  uclibc-0.9.30.1
+* xstatic/i486-linux-gnu/bin/ld renamed to ld.bin
+* added binlib from Ubuntu Lucid
+* added bin/clang trampoline binary
+* added xstatic/i486-linux-gnu/bin/ld trampoline binary
