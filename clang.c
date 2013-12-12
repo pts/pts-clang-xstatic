@@ -22,7 +22,7 @@ static char *strdupcat(const char *a, const char *b, const char *c) {
 }
 
 static char *readlink_alloc(const char *path) {
-  ssize_t len = 6;
+  ssize_t len = 256;
   ssize_t got;
   char *buf = malloc(len);
   for (;;) {
@@ -47,7 +47,7 @@ static char *readlink_alloc_all(const char *path) {
       for (p = path1 + strlen(path1); p != path1 && p[-1] != '/'; --p) {}
       if (p != path1) {
         *p = '\0';  /* Remove basename from path1. */
-        p = strdupcat(path1, "/", path2);
+        p = strdupcat(path1, "", path2);
         free(path2);
         path2 = p;
       }
@@ -59,6 +59,10 @@ static char *readlink_alloc_all(const char *path) {
 }
 
 int main(int argc, char **argv) {
+  /* TODO(pts): What if argv[0] doesn't contain a slash (e.g. bash before
+   * rehash)? In that case a readlink on /proc/self/exe solves it.
+   */
+  char *prog;
   char *dir = argv[0][0] == '\0' ? strdup("x") :
       strdup(readlink_alloc_all(argv[0]));
   char *p;
@@ -79,7 +83,7 @@ int main(int argc, char **argv) {
    */
   argp = args = malloc(sizeof(*args) * (argc + 10));
   *argp++ = argv[0];  /* No effect, `clang.bin: error: no input files'. */
-  *argp++ = strdupcat(dir, "/clang.bin", "");
+  *argp++ = prog = strdupcat(dir, "/clang.bin", "");
   /* Needed, because clang can't detect C++ness from clang.bin. */
   if (is_cxx) *argp++ = "-ccc-cxx";
   if (argv[1] && 0 == strcmp(argv[1], "-xstatic")) {
@@ -107,5 +111,7 @@ int main(int argc, char **argv) {
   }
   memcpy(argp, argv + 1, argc * sizeof(*argp));
   execv(strdupcat(dir, "/../binlib/ld-linux.so.2", ""), args);
+  p = strdupcat("error: clang: exec failed: ", prog, "\n");
+  write(2, p, strlen(p));
   return 120;
 }
