@@ -32,6 +32,7 @@ int main(int argc, char **argv) {
    * -L/lib...
    * --hash-style=both (because not supported by old ld)
    * --build-id (because not supported by old ld)
+   * -z relro (because it increases the binary size and it's useless for static)
    */
   char **args, **argp, *arg;
   char *argv0 = argv[0];
@@ -39,7 +40,9 @@ int main(int argc, char **argv) {
   argp = args = malloc(sizeof(*args) * (argc + 1));
   *argp++ = *argv++;
   for (; (arg = *argv); ++argv) {
-    if (0 != strcmp(arg, "--hash-style=both") &&
+    if (0 == strcmp(arg, "-z") && argv[1] && 0 == strcmp(argv[1], "relro")) {
+      ++argv;  /* Skip and drop both arguments: -z relro */
+    } else if (0 != strcmp(arg, "--hash-style=both") &&
         0 != strcmp(arg, "--build-id") &&
         !is_dirprefix(arg, "-L/usr/lib") &&
         !is_dirprefix(arg, "-L/lib")) {
