@@ -54,6 +54,7 @@ int main(int argc, char **argv) {
      * clang.bin: warning: argument unused during compilation: '-nostdinc'
      * -Qunused-arguments, but only for this flag.
      */
+    *argp++ = "-Qunused-arguments";
     *argp++ = "-nostdinc";
     *argp++ = strdupcat("-I", dir, "/../lib/clang/cur/include");
     *argp++ = strdupcat("-I", dir, "/../xstatic/include");
