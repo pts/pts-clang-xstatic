@@ -59,12 +59,9 @@ static char *readlink_alloc_all(const char *path) {
 }
 
 int main(int argc, char **argv) {
-  /* TODO(pts): What if argv[0] doesn't contain a slash (e.g. bash before
-   * rehash)? In that case a readlink on /proc/self/exe solves it.
-   */
   char *prog;
-  char *dir = argv[0][0] == '\0' ? strdup("x") :
-      strdup(readlink_alloc_all(argv[0]));
+  char *dir = argv[0][0] == '\0' ? strdup("x") : strdup(readlink_alloc_all(
+      strstr(argv[0], "/") ? argv[0] : "/proc/self/exe"));
   char *p;
   char **args, **argp;
   char is_cxx;
