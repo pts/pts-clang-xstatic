@@ -21,8 +21,46 @@ static char *strdupcat(const char *a, const char *b, const char *c) {
   return p;
 }
 
+static char *readlink_alloc(const char *path) {
+  ssize_t len = 6;
+  ssize_t got;
+  char *buf = malloc(len);
+  for (;;) {
+    if (0 > (got = readlink(path, buf, len))) {
+      free(buf);
+      return NULL;
+    }
+    if (got < len) {
+      buf[got] = '\0';
+      return buf;
+    }
+    buf = realloc(buf, len <<= 1);
+  }
+}
+
+/** Resolve symlinks until a non-symlink is found. */
+static char *readlink_alloc_all(const char *path) {
+  char *path2, *path1 = strdup(path);
+  while ((path2 = readlink_alloc(path1))) {
+    if (path2[0] != '/') {
+      char *p;
+      for (p = path1 + strlen(path1); p != path1 && p[-1] != '/'; --p) {}
+      if (p != path1) {
+        *p = '\0';  /* Remove basename from path1. */
+        p = strdupcat(path1, "/", path2);
+        free(path2);
+        path2 = p;
+      }
+    }
+    free(path1);
+    path1 = path2;
+  }
+  return path1;
+}
+
 int main(int argc, char **argv) {
-  char *dir = argv[0][0] == '\0' ? strdup("x") : strdup(argv[0]);
+  char *dir = argv[0][0] == '\0' ? strdup("x") :
+      strdup(readlink_alloc_all(argv[0]));
   char *p;
   char **args, **argp;
   char is_cxx;
