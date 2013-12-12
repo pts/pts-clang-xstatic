@@ -1,0 +1,23 @@
+#! /usr/bin/perl -w
+# by pts@fazekas.hu at Thu Dec 12 23:38:13 CET 2013
+use integer;
+use strict;
+
+# TODO(pts): Add clang support.
+die "Usage: $0 <gcc> [<gcc-arg>...]
+Invokes gcc -static against the xstatic uClibc.
+" if !@ARGV or $ARGV[0] eq '--help';
+die "$0: error: please specify gcc prog in 1st arg\n" if $ARGV[0] =~ /\A-/;
+
+my $gcc = shift(@ARGV);
+my $sysroot = '/tmp/sr'; # !! 
+{
+  my $crt1_fn = "$sysroot/gccld/crt1.o";  # Other *crt*.o is also needed.
+  die "$0: error: file not found: $crt1_fn\n" if !(-f $crt1_fn);
+  my $ld_fn = "$sysroot/gccld/crt1.o";  # Other *crt*.o is also needed.
+  die "$0: error: file not found: $ld_fn\n" if !(-f $ld_fn);
+}
+# Our ld would be invoked because of -B.
+my @a = (
+    $gcc, '-m32', '-static', '--sysroot', $sysroot, "-B$sysroot/gccld", @ARGV);
+die "$0: error: exec $a[0]: $!\n" if !exec @a;
