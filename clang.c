@@ -50,6 +50,10 @@ int main(int argc, char **argv) {
     /* When adding more arguments here, increase the args malloc count. */
     *argp++ = "-m32";
     *argp++ = "-static";
+    /* TODO(pts): Get rid of this warning if compiling only .o files:
+     * clang.bin: warning: argument unused during compilation: '-nostdinc'
+     * -Qunused-arguments, but only for this flag.
+     */
     *argp++ = "-nostdinc";
     *argp++ = strdupcat("-I", dir, "/../lib/clang/cur/include");
     *argp++ = strdupcat("-I", dir, "/../xstatic/include");
