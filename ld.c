@@ -12,13 +12,15 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-static char *strdupcat2(const char *a, const char *b) {
-  const size_t sa = strlen(a), sb = strlen(b);
-  char *p = malloc(sa + sb + 1);
+static char *strdupcat(const char *a, const char *b, const char *c) {
+  const size_t sa = strlen(a), sb = strlen(b), sc = strlen(c);
+  char *p = malloc(sa + sb + sc + 1);
   memcpy(p, a, sa);
-  strcpy(p + sa, b);
+  memcpy(p + sa, b, sb);
+  strcpy(p + sa + sb, c);
   return p;
 }
+
 
 static char is_dirprefix(const char *s, const char *prefix) {
   const char const *p = prefix + strlen(prefix);
@@ -35,7 +37,7 @@ int main(int argc, char **argv) {
    * -z relro (because it increases the binary size and it's useless for static)
    */
   char **args, **argp, *arg;
-  char *argv0 = argv[0];
+  char *argv0 = argv[0], *prog;
 
   argp = args = malloc(sizeof(*args) * (argc + 1));
   *argp++ = *argv++;
@@ -50,6 +52,9 @@ int main(int argc, char **argv) {
     }
   }
   *argp = NULL;
-  execv(strdupcat2(argv0, ".bin"), args);
+  prog = strdupcat(argv0, ".bin", "");
+  execv(prog, args);
+  prog = strdupcat("error: clang: exec failed: ", prog, "\n");
+  write(2, prog, strlen(prog));
   return 120;
 }
