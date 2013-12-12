@@ -18,3 +18,4 @@ TODOs:
 * TODO(pts): Do we need collect2 for constructors? gcc calls collect2.
 * TODO(pts): Remove the lib/ld-linux.so.2 symlink, and make the
   binlib/ld-linux.so.2 work when clang.bin executes itself.
+* TODO(pts): autodetect 3.3 in the clang cur symlink
