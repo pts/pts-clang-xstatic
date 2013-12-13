@@ -3,10 +3,11 @@
     -W -Wall -o clang "$0"; exit 1
 
 /*
- * clang.c: clang trampoline for .so file redirection
- * by pts@fazekas.hu at Thu Dec 12 01:41:42 CET 2013
+ * clang.c: clang trampoline for .so file redirection and -static linking
+ * by pts@fazekas.hu at Fri Dec 13 22:17:42 CET 2013
  */
 
+#define _GNU_SOURCE 1  /* Needed for get_current_dir_name() */
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
@@ -58,31 +59,44 @@ static char *readlink_alloc_all(const char *path) {
   return path1;
 }
 
+static char *path_join(char *a, char *b) {
+  return !a ? b : (b[0] == '/') ? strdupcat("", "", b) : strdupcat(a, "/", b);
+}
+
 int main(int argc, char **argv) {
   char *prog;
+  char *ldso0;
   char *dir = argv[0][0] == '\0' ? strdup("x") : strdup(readlink_alloc_all(
       strstr(argv[0], "/") ? argv[0] : "/proc/self/exe"));
   char *p;
   char **args, **argp;
-  char is_cxx;
   for (p = dir + strlen(dir); p != dir && p[-1] != '/'; --p) {}
-  is_cxx = strstr(p, "++") ? 1 : 0;
   if (p == dir) {
     strcpy(dir, ".");
   } else {
     p[-1] = '\0';
   }
-  putenv(strdupcat("LD_LIBRARY_PATH=", dir, "/../binlib"));
+  /* RPATH=$ORIGIN/../binlib (set manually in clang.bin) takes care of this */
+  /* in clang.bin /proc/self/exE was modified to /proc/self/exe */
+  /* Needed so ld0.so doesn't consult /etc/ld.so.cache */
+  putenv("LD0LIBRARY_PATH=/dev/null/missing");
   /* clang was doing:
    * readlink("/proc/self/exe", ".../clang/binlib/ld-linux.so.2", ...)
    * ... and believed it's ld-linux.so.2. I edited the binary to /proc/self/exE
    * to fix it.
    */
   argp = args = malloc(sizeof(*args) * (argc + 10));
-  *argp++ = argv[0];  /* No effect, `clang.bin: error: no input files'. */
+  *argp++ = argv[0];  /* No effect, will be ignored. */
+  /* TODO(pts): Make clang.bin configurable. */
   *argp++ = prog = strdupcat(dir, "/clang.bin", "");
-  /* Needed, because clang can't detect C++ness from clang.bin. */
-  if (is_cxx) *argp++ = "-ccc-cxx";
+  if (argv[0][0] == '/') {
+    *argp++ = argv[0];  /* ld0.so will put it to clang.bin's argv[0]. */
+  } else {
+    /* Clang 3.3 can't find itself (for with -cc1) unless its argv[0] is an
+     * absolute pathname. So we make it absolute.
+     */
+    *argp++ = path_join(get_current_dir_name(), argv[0]);
+  }
   if (argv[1] && 0 == strcmp(argv[1], "-xstatic")) {
     ++argv;
     --argc;
@@ -107,8 +121,9 @@ int main(int argc, char **argv) {
      */
   }
   memcpy(argp, argv + 1, argc * sizeof(*argp));
-  execv(strdupcat(dir, "/../binlib/ld-linux.so.2", ""), args);
+  ldso0 = strdupcat(dir, "/../binlib/ld0.so", "");
+  execv(ldso0, args);
   p = strdupcat("error: clang: exec failed: ", prog, "\n");
-  write(2, p, strlen(p));
+  (void)!write(2, p, strlen(p));
   return 120;
 }
