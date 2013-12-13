@@ -7,6 +7,7 @@
  * by pts@fazekas.hu at Fri Dec 13 22:17:42 CET 2013
  */
 
+#define _GNU_SOURCE 1  /* Needed for get_current_dir_name() */
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
@@ -58,6 +59,10 @@ static char *readlink_alloc_all(const char *path) {
   return path1;
 }
 
+static char *path_join(char *a, char *b) {
+  return !a ? b : (b[0] == '/') ? strdupcat("", "", b) : strdupcat(a, "/", b);
+}
+
 int main(int argc, char **argv) {
   char *prog;
   char *ldso0;
@@ -71,7 +76,9 @@ int main(int argc, char **argv) {
   } else {
     p[-1] = '\0';
   }
-  /* RPATH=$ORIGIN/../binlib takes care of this */
+  /* RPATH=$ORIGIN/../binlib (set manually in clang.bin) takes care of this */
+  /* in clang.bin /proc/self/exE was modified to /proc/self/exe */
+  /* Needed so ld0.so doesn't consult /etc/ld.so.cache */
   putenv("LD_LIBRARY_PATH=/dev/null/missing");
   /* clang was doing:
    * readlink("/proc/self/exe", ".../clang/binlib/ld-linux.so.2", ...)
@@ -82,9 +89,16 @@ int main(int argc, char **argv) {
   *argp++ = argv[0];  /* No effect, will be ignored. */
   /* TODO(pts): Make clang.bin configurable. */
   *argp++ = prog = strdupcat(dir, "/clang.bin", "");
-  *argp++ = argv[0];  /* ld0.so will put it to argv[0]. */
+  if (argv[0][0] == '/') {
+    *argp++ = argv[0];  /* ld0.so will put it to clang.bin's argv[0]. */
+  } else {
+    /* Clang 3.3 can't find itself (for with -cc1) unless its argv[0] is an
+     * absolute pathname. So we make it absolute.
+     */
+    *argp++ = path_join(get_current_dir_name(), argv[0]);
+  }
   memcpy(argp, argv + 1, argc * sizeof(*argp));
-  args[0] = ldso0 = strdupcat(dir, "/../binlib/ld0.so", "");
+  ldso0 = strdupcat(dir, "/../binlib/ld0.so", "");
   execv(ldso0, args);
   p = strdupcat("error: clang: exec failed: ", prog, "\n");
   (void)!write(2, p, strlen(p));
