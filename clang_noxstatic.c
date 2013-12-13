@@ -1,6 +1,6 @@
 #define ALONE \
     set -ex; exec ${CC:-gcc} -s -Os -fno-stack-protector \
-    -W -Wall -o clang "$0"; exit 1
+    -W -Wall -o clang_noxstatic "$0"; exit 1
 
 /*
  * clang.c: clang trampoline for .so file redirection
