@@ -71,7 +71,8 @@ int main(int argc, char **argv) {
   } else {
     p[-1] = '\0';
   }
-  putenv(strdupcat("LD_LIBRARY_PATH=", dir, "/../binlib"));
+  /* RPATH=$ORIGIN/../binlib takes care of this */
+  putenv("LD_LIBRARY_PATH=/dev/null/missing");
   /* clang was doing:
    * readlink("/proc/self/exe", ".../clang/binlib/ld-linux.so.2", ...)
    * ... and believed it's ld-linux.so.2. I edited the binary to /proc/self/exE
