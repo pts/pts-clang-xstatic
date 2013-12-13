@@ -7,6 +7,11 @@
 #            and usr/include/limits
 # TODO(pts): Rewrite ld Perl script in C once we have Clang support.
 # TODO(pts): Rewrite in C once we have Clang support.
+# TODO(pts): Test exception handling in various g++ versions.
+#
+# Tested and found working with GCC (both gcc and g++) versions: 4.4.3 on
+# Ubuntu Lucid, 4.6.2 on Ubuntu Precise and
+# 4.8.2 on Debian Jessie.
 #
 # The error
 #
@@ -14,7 +19,8 @@
 #
 # indicates that cc1plus and libstdc++ were compiled with a different exception
 # handling (EH) personality. The other one is __gxx_personality_lj0. There is
-# no easy fix except for recompiling one of them. If exception handling is not
+# no easy fix except for recompiling one of them. (Sometimes hello.cc compiles
+# without -fno-exceptions, but other code doesn't.) If exception handling is not
 # needed, then `-fno-exceptions' can be specified at .cc compilation time, and
 # the linker error will go away.
 #
