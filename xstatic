@@ -4,6 +4,7 @@
 # TODO(pts): Add Clang support.
 # TODO(pts): Add magic Perl header, then convert to C.
 # TODO(pts): Document new conditions in usr/include/bits/cpp_type_traits.h
+#            and usr/include/limits
 # TODO(pts): Rewrite ld Perl script in C once we have Clang support.
 # TODO(pts): Rewrite in C once we have Clang support.
 #
@@ -64,6 +65,11 @@ sub run_xstatic() {
 
   # Our $sysroot/gccld/ld binary would be invoked because of -B. And that binary
   # would run us.
+  #
+  # In addition to -B, the gccld/i386-linux-gnu symlink is needed on Ubuntu
+  # Precise so that the right crt1.o gets found.
+  #
+  # TODO(pts): Detect wrong crt1.o (in /usr/lib/i386-linux-gnu etc.).
   my @a = (
       $gcc, '-m32', '-static',
       '-Wl,--xstatic-ld',
@@ -111,6 +117,7 @@ sub run_ld() {
       defined($sysroot_arg) and $sysroot_arg ne $sysroot;
 
   my $lgccld = "-L$sysroot/gccld";
+  my $lgccldi = "-L$sysroot/gccld/i386-linux-gnu";
   if (!defined $gccbdir) {  # Probably `gcc -nostdlib'.
     for ($i = 0; $i < @ARGV; ++$i) {
       my $arg = $ARGV[$i];
@@ -141,15 +148,18 @@ sub run_ld() {
     } elsif (0 or
         $arg eq '--build-id' or  # Would increase file size.
         $arg eq '--hash-style=both' or  # Would increase file size.
+        $arg eq '--hash-style=gnu' or  # Seems to be unneeded.
         $arg eq '-L/usr/lib' or
         $arg eq '-L/lib' or
         $arg eq '-L/usr/local/lib' or
         $arg eq $lgccld or
+        $arg eq $lgccldi or
         $arg eq $lsysrootusrlib or
         $arg eq $lsysrootusrlibddlib or
         # -L/usr/lib/gcc/i486-linux-gnu/4.4.3/../../../../lib  # /usr/lib
-        $arg =~ m@\A-L@ and $arg =~ m@/\.\./\.\./\.\./\.\./lib\Z(?!\n)@ or
+        $arg =~ m@\A-L@ and $arg =~ m@/\.\./\.\./\.\./\.\./lib(?:32)?\Z(?!\n)@ or
         $arg =~ m@\A-L@ and $arg =~ m@/\.\./\.\./\.\.\Z(?!\n)@ or
+        $arg =~ m@\A-L@ and $arg =~ m@/\.\./\.\./\.\./i386-linux-gnu\Z(?!\n)@ or
        0) {
     } elsif ($arg eq '-z' and $i < $#ARGV and $ARGV[$i + 1] eq 'relro') {
       # Would increase file size.
