@@ -1,8 +1,11 @@
 #! /usr/bin/perl -w
 # by pts@fazekas.hu at Thu Dec 12 23:38:13 CET 2013
 #
+# TODO(pts): Add Clang support.
 # TODO(pts): Add magic Perl header, then convert to C.
-# TODO(pts): Document usr/include/bits/cpp_type_traits.h
+# TODO(pts): Document new conditions in usr/include/bits/cpp_type_traits.h
+# TODO(pts): Rewrite ld Perl script in C once we have Clang support.
+# TODO(pts): Rewrite in C once we have Clang support.
 #
 # The error
 #
@@ -18,52 +21,164 @@
 use integer;
 use strict;
 
-# TODO(pts): Add clang support.
-die "Usage: $0 <gcc> [<gcc-arg>...]
-Invokes gcc -static against the xstatic uClibc.
-" if !@ARGV or $ARGV[0] eq '--help';
-die "$0: error: please specify gcc prog in 1st arg\n" if $ARGV[0] =~ /\A-/;
+sub run_xstatic() {
+  die "Usage: $0 <gcc> [<gcc-arg>...]
+  Invokes gcc -static against the xstatic uClibc.
+  " if !@ARGV or $ARGV[0] eq '--help';
+  die "$0: error: please specify gcc prog in 1st arg\n" if $ARGV[0] =~ /\A-/;
 
-my $gcc = shift(@ARGV);
-#my $argv0 = readlink("/proc/self/exe");  # /usr/bin/perl, useless.
-my $prog0 = index($0, '/') < 0 ? "./$0" : $0;  # TODO(pts): $ENV{PATH} lookup.
-my $link0 = readlink($prog0);
-#die "$0: error: cannot readlink /proc/self/exe: $!\n" if !defined $link0;
-$prog0 = substr($link0, 0, 1) eq '/' ? $link0 :
-    substr($prog0, 0, rindex($prog0, '/') + 1) . $link0 if defined $link0;
-die "$0: error: prog not in bin: $prog0\n" if
-    $prog0 !~ m@(/bin/[^/]++)\Z(?!\n)@;
-my $sysroot = substr($prog0, 0, -length($1));
-{
-  my $crt1_fn = "$sysroot/gccld/crt1.o";  # Other *crt*.o is also needed.
-  die "$0: error: file not found: $crt1_fn\n" if !(-f $crt1_fn);
-  my $ld_fn = "$sysroot/gccld/crt1.o";  # Other *crt*.o is also needed.
-  die "$0: error: file not found: $ld_fn\n" if !(-f $ld_fn);
-}
-my $gcc_prog = $gcc;
-$gcc_prog =~ s@\A.*/@@s;
-my $need_nostdincxx = index($gcc_prog, '++') >= 0;
-if (!$need_nostdincxx) {  # Also detect `-x c++'.
-  my $i = 0;
-  for ($i = 0; $i < @ARGV and !$need_nostdincxx; ++$i) {
-    my $arg = $ARGV[$i];
-    if ($arg eq '-xc++') {
-      $need_nostdincxx = 1;
-    } elsif ($arg eq '-x' and $i < $#ARGV) {
-      $need_nostdincxx = 1 if $ARGV[++$i] eq 'c++';
-    } elsif (substr($arg, 0, 1) ne '-' and
-             $arg =~ /[.](?:cc|cp|cxx|cpp|CPP|c[+][+]|C)\Z(?!\n)/) {
-      $need_nostdincxx = 1;
+  my $gcc = shift(@ARGV);
+  #my $argv0 = readlink("/proc/self/exe");  # /usr/bin/perl, useless.
+  my $prog0 = index($0, '/') < 0 ? "./$0" : $0;  # TODO(pts): $ENV{PATH} lookup.
+  my $link0 = readlink($prog0);
+  #die "$0: error: cannot readlink /proc/self/exe: $!\n" if !defined $link0;
+  $prog0 = substr($link0, 0, 1) eq '/' ? $link0 :
+      substr($prog0, 0, rindex($prog0, '/') + 1) . $link0 if defined $link0;
+  die "$0: error: prog not in bin: $prog0\n" if
+      $prog0 !~ m@(/bin/[^/]++)\Z(?!\n)@;
+  my $sysroot = substr($prog0, 0, -length($1));
+  {
+    my $crt1_fn = "$sysroot/gccld/crt1.o";  # Other *crt*.o is also needed.
+    die "$0: error: file not found: $crt1_fn\n" if !(-f $crt1_fn);
+    my $ld_fn = "$sysroot/gccld/crt1.o";  # Other *crt*.o is also needed.
+    die "$0: error: file not found: $ld_fn\n" if !(-f $ld_fn);
+  }
+  my $gcc_prog = $gcc;
+  $gcc_prog =~ s@\A.*/@@s;
+  my $need_nostdincxx = index($gcc_prog, '++') >= 0;
+  if (!$need_nostdincxx) {  # Also detect `-x c++'.
+    my $i = 0;
+    for ($i = 0; $i < @ARGV and !$need_nostdincxx; ++$i) {
+      my $arg = $ARGV[$i];
+      if ($arg eq '-xc++') {
+        $need_nostdincxx = 1;
+      } elsif ($arg eq '-x' and $i < $#ARGV) {
+        $need_nostdincxx = 1 if $ARGV[++$i] eq 'c++';
+      } elsif (substr($arg, 0, 1) ne '-' and
+               $arg =~ /[.](?:cc|cp|cxx|cpp|CPP|c[+][+]|C)\Z(?!\n)/) {
+        $need_nostdincxx = 1;
+      }
     }
   }
+  my $has_v = (grep { $_ eq '-v' } @ARGV) ? 1 : 0;
+
+  # Our $sysroot/gccld/ld binary would be invoked because of -B. And that binary
+  # would run us.
+  my @a = (
+      $gcc, '-m32', '-static', '-Wl,--xstatic-ld', '-Wl,' . $has_v,
+      '-Wl,' . $prog0,
+      # Without -nostdinc++, /usr/include/c++/4.4/iostream would take precedence
+      # over $sysroot/usr/include/iostream.
+      $need_nostdincxx ? ('-nostdinc++') : (),
+      '--sysroot', $sysroot, "-B$sysroot/gccld", @ARGV);
+  # TODO(pts): Be smarter to detect no input files.
+  @a = ($gcc, '-m32', '-static', @ARGV) if !@ARGV or ($ARGV[0] eq '-v');
+  die "$0: error: exec $a[0]: $!\n" if !exec @a;
 }
 
-# Our ld would be invoked because of -B.
-my @a = (
-    $gcc, '-m32', '-static',
-    # Without -nostdinc++, /usr/include/c++/4.4/iostream would take precedence
-    # over $sysroot/usr/include/iostream.
-    $need_nostdincxx ? ('-nostdinc++') : (),
-    '--sysroot', $sysroot, "-B$sysroot/gccld", @ARGV);
-die "$0: error: exec $a[0]: $!\n" if !exec @a;
-# !! TODO(pts): unify script with ld
+sub run_ld() {
+  my $is_static;
+  my $i;
+  my $gccbdir;
+  my $sysroot;
+  for ($i = 1; $i < @ARGV; ++$i) {
+    my $arg = $ARGV[$i];
+    if ($arg eq '-static') {
+      $is_static = 1;
+    } elsif ($arg eq '--sysroot' and $i < $#ARGV) {
+      die "$0: error: multiple --sysroot args\n" if defined $sysroot;
+      $sysroot = $ARGV[++$i];
+    } elsif ($arg =~ /\A--sysroot=(.*+)/s) {
+      die "$0: error: multiple --sysroot args\n" if defined $sysroot;
+      $sysroot = $1;
+    # /usr/lib/gcc/i486-linux-gnu/4.4.3/crtbeginT.o
+    } elsif (!defined $gccbdir and $arg =~ m@(/crtbegin[A-Z]?[.]o)\Z(?!\n)@) {
+      $gccbdir = substr($arg, 0, -length($1));
+      last if $is_static;  # Shortcut.
+    }
+  }
+  die "$0: error: missing -static\n" if !$is_static;
+  # TODO(pts): Don't use $0, pass $sysroot in -Wl,... and back.
+  #my $lgccld = "-L$sysroot/gccld";
+  my $lgccld = "-L$0";
+  die "$0: error: missing / in command name" if $lgccld !~ s@/[^/]++\Z(?!\n)@@;
+  if (defined $sysroot) {
+    if ("-L$sysroot/bin" eq $lgccld) {
+      $lgccld = "-L$sysroot/gccld";
+    } elsif ("-L$sysroot/gccld" ne $lgccld) {
+      die "$0: error: lgccld mismatch: from_argv0=$lgccld, from_sysroot=-l$sysroot/gccld\n";
+    }
+  } else {
+    $sysroot = substr($lgccld, 2);
+    die "$0: error: trailing gccld or bin expected: $sysroot\n" if
+        $sysroot !~ s@/(?:gccld|bin)\Z(?!\n)@@;
+  }
+  if (!defined $gccbdir) {  # Probably `gcc -nostdlib'.
+    for ($i = 1; $i < @ARGV; ++$i) {
+      my $arg = $ARGV[$i];
+      if ($arg =~ /\A-L/ and $arg ne $lgccld) {
+        # Pick the first -L which is not uClibc's ($lgccld).
+        $gccbdir = substr($arg, 2);
+        last;
+      }
+    }
+    die "$0: error: cannot detect gcc built-in -B directory\n" if
+        !defined($gccbdir);
+  }
+
+  # `ld -nostdlib' is different from `gcc -nostdlib'.
+  # Move our ($sysroot) lib directory to the front, before $gccbdir (with
+  # libgcc.a).
+  my @a = ('ld', '-nostdlib', "-L$sysroot/usr/lib");
+  my $lsysrootusrlib = "-L$sysroot/usr/lib";
+  my $lsysrootusrlibddlib = "-L$sysroot/usr/lib/../lib";
+  my $is_verbose = 0;
+  for ($i = 0; $i < @ARGV; ++$i) {
+    my $arg = $ARGV[$i];
+    if ($arg eq '--do-xstatic-ld' and $i < $#ARGV) {  # A marker with arg.
+      $is_verbose = $ARGV[++$i] + 0;
+    } elsif ($arg eq '--sysroot' and $i < $#ARGV) {
+      ++$i;
+    } elsif ($arg =~ /\A--sysroot=/) {
+      ++$i;
+    } elsif (0 or
+        $arg eq '--build-id' or  # Would increase file size.
+        $arg eq '--hash-style=both' or  # Would increase file size.
+        $arg eq '-L/usr/lib' or
+        $arg eq '-L/lib' or
+        $arg eq '-L/usr/local/lib' or
+        $arg eq $lgccld or
+        $arg eq $lsysrootusrlib or
+        $arg eq $lsysrootusrlibddlib or
+        # -L/usr/lib/gcc/i486-linux-gnu/4.4.3/../../../../lib  # /usr/lib
+        $arg =~ m@\A-L@ and $arg =~ m@/\.\./\.\./\.\./\.\./lib\Z(?!\n)@ or
+        $arg =~ m@\A-L@ and $arg =~ m@/\.\./\.\./\.\.\Z(?!\n)@ or
+       0) {
+    } elsif ($arg eq '-z' and $i < $#ARGV and $ARGV[$i + 1] eq 'relro') {
+      # Would increase file size.
+      ++$i;
+    } elsif ($arg eq '-lstdc++') {
+      # Fixup for linker errors: undefined reference to `_Unwind_SjLj_Unregister'.
+      push @a, $arg, '-lstdc++usjlj';  # The order is important.
+    } else {
+      push @a, $arg;
+    }
+  }
+
+  if (-f "$gccbdir/ld") {
+    # If not found here we could try "$gccbdir/../../ld", i.e. /usr/lib/gcc/ld,
+    # because `gcc -B/usr/lib/gcc' also tries it.
+    $a[0] = "$gccbdir/ld";  # Override 'ld' (on $PATH).
+  }
+
+  print STDERR "$0: info: running linker:\n@a\n" if $is_verbose;
+  die "$0: error: exec $a[0]: $!\n" if !exec @a;
+}
+
+# When gcc runs ld (as collect2), the -Wl,... flags are not passed at the
+# front.
+if (@ARGV > 1 and $ARGV[0] eq '--do-xstatic-ld') {
+  run_ld();
+} else {
+  run_xstatic();
+}
