@@ -7,6 +7,7 @@
 # TODO(pts): Rewrite ld Perl script in C once we have Clang support.
 # TODO(pts): Rewrite in C once we have Clang support.
 # TODO(pts): Test exception handling in various g++ versions.
+# TODO(pts): Recompile Clang 3.3. statically.
 #
 # Tested and found working with GCC (both gcc and g++) versions: 4.4.3 on
 # Ubuntu Lucid, 4.6.2 on Ubuntu Precise and
@@ -58,15 +59,11 @@ Invokes gcc -static against the xstatic uClibc.
       my $arg = $ARGV[$i];
       if ($arg eq '-xc++') {
         $need_nostdincxx = 1;
-      } elsif ($arg eq '-ccc-cxx') {  # Enable C++ for clang.
+      } elsif ($arg eq '-ccc-cxx') {  # Enable C++ for Clang.
+        # -ccc-cxx is a Clang-specific flag, gcc doesn't have it.
         $need_nostdincxx = 1;
-        # !! better autodetect clang++ (needed?)
+        # !! better autodetect C++ clang++ (needed?)
         # !! verify no system includes
-        # !! why is clang 767752 bytes vs g++ 522096 bytes for hello.cc?
-        #    !! strip removes it after clang, but why doesn't ld remove it?
-        #    !! even -Wl,S doesn't help
-        #    !! same for hello.c, strip removes some bytes
-        #       how is pts-clang-xstatic different?
       } elsif ($arg eq '-x' and $i < $#ARGV) {
         $need_nostdincxx = 1 if $ARGV[++$i] eq 'c++';
       } elsif (substr($arg, 0, 1) ne '-' and
@@ -76,6 +73,8 @@ Invokes gcc -static against the xstatic uClibc.
     }
   }
   my $has_v = (grep { $_ eq '-v' } @ARGV) ? 1 : 0;
+  my $need_linker = (grep { $_ eq '-E' or $_ eq '-S' or $_ eq '-c' } @ARGV) ?
+      0 : 1;
 
   # Our $sysroot/gccld/ld binary would be invoked because of -B. And that binary
   # would run us.
@@ -86,10 +85,11 @@ Invokes gcc -static against the xstatic uClibc.
   # TODO(pts): Detect wrong crt1.o (in /usr/lib/i386-linux-gnu etc.).
   my @a = (
       $gcc, '-m32', '-static',
-      '-Wl,--xstatic-ld',
-      '-Wl,' . $prog0,
-      '-Wl,' . $has_v,
-      '-Wl,' . $sysroot,
+      $need_linker ? (  # `clang -c' warns about these flags.
+        '-Wl,--xstatic-ld',
+        '-Wl,' . $prog0,
+        '-Wl,' . $has_v,
+        '-Wl,' . $sysroot) : (),
       # Without -nostdinc++, /usr/include/c++/4.4/iostream would take precedence
       # over $sysroot/usr/include/iostream.
       $need_nostdincxx ? ('-nostdinc++') : (),
@@ -120,9 +120,10 @@ sub run_ld() {
       $is_verbose = $ARGV[++$i];
       $sysroot = $ARGV[++$i];
     # /usr/lib/gcc/i486-linux-gnu/4.4.3/crtbeginT.o
-    } elsif (!defined $gccbdir and $arg =~ m@(/crtbegin[A-Z]?[.]o)\Z(?!\n)@) {
+    # There is crtbeginT.o, crtbeginS.o and crtbegin.o. When building static
+    # executables, crtbeginT.o is used.
+    } elsif (!defined $gccbdir and $arg =~ m@(/crtbeginT?[.]o)\Z(?!\n)@) {
       $gccbdir = substr($arg, 0, -length($1));
-      last if $is_static;  # Shortcut.
     }
   }
   die "$0: error: missing --do-xstatic-ld\n" if !defined($sysroot);
@@ -141,6 +142,8 @@ sub run_ld() {
         last;
       }
     }
+    # !! for clang we'd find:
+    # /home/pts/bin.local/../prg/xstatic/usr/lib
     die "$0: error: cannot detect gcc built-in -B directory\n" if
         !defined($gccbdir);
   }
@@ -151,6 +154,7 @@ sub run_ld() {
   my @a = ('ld', '-nostdlib', "-L$sysroot/usr/lib");
   my $lsysrootusrlib = "-L$sysroot/usr/lib";
   my $lsysrootusrlibddlib = "-L$sysroot/usr/lib/../lib";
+  my $has_nodir_crt = 0;
   for ($i = 0; $i < @ARGV; ++$i) {
     my $arg = $ARGV[$i];
     if ($arg eq '--do-xstatic-ld' and $i + 2 < @ARGV) {  # A marker with arg.
@@ -158,7 +162,6 @@ sub run_ld() {
     } elsif ($arg eq '--sysroot' and $i < $#ARGV) {
       ++$i;
     } elsif ($arg =~ /\A--sysroot=/) {
-      ++$i;
     } elsif (0 or
         $arg eq '--build-id' or  # Would increase file size.
         $arg eq '--hash-style=both' or  # Would increase file size.
@@ -181,14 +184,15 @@ sub run_ld() {
     } elsif ($arg eq '-lstdc++') {
       # Fixup for linker errors: undefined reference to `_Unwind_SjLj_Unregister'.
       push @a, $arg, '-lstdc++usjlj';  # The order is important.
-    } elsif ($arg eq 'crtbegin.o' or  # !! only clang needs it, from cross-compiler
-             $arg eq 'crtbeginT.o' or 
-             $arg eq 'crtbeginS.o' or
-             $arg eq 'crtend.o' or
-             $arg eq 'crtendS.o' or
-             $arg eq 'crtfastmath.o') {
-      push @a, "$sysroot/libgcc/$arg";
-      push @a, "-L$sysroot/libgcc";  # !! do it once only
+    } elsif ($arg eq 'crtbeginT.o') {  # For Clang.
+      if (!$has_nodir_crt) {
+        push @a, "-L$sysroot/clanglibgcc";
+        $has_nodir_crt = 1;
+      }
+      push @a, "$sysroot/clanglibgcc/$arg";
+    } elsif ($has_nodir_crt and
+             ($arg eq 'crtend.o' or $arg eq 'crtfastmath.o')) {
+      push @a, "$sysroot/clanglibgcc/$arg";
     } else {
       push @a, $arg;
     }
