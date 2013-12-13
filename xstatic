@@ -1,5 +1,20 @@
 #! /usr/bin/perl -w
 # by pts@fazekas.hu at Thu Dec 12 23:38:13 CET 2013
+#
+# TODO(pts): Add magic Perl header, then convert to C.
+# TODO(pts): Document usr/include/bits/cpp_type_traits.h
+#
+# The error
+#
+#   ....o:(.eh_frame+0x...): undefined reference to `__gxx_personality_v0'
+#
+# indicates that cc1plus and libstdc++ were compiled with a different exception
+# handling (EH) personality. The other one is __gxx_personality_lj0. There is
+# no easy fix except for recompiling one of them. If exception handling is not
+# needed, then `-fno-exceptions' can be specified at .cc compilation time, and
+# the linker error will go away.
+#
+
 use integer;
 use strict;
 
@@ -10,14 +25,45 @@ Invokes gcc -static against the xstatic uClibc.
 die "$0: error: please specify gcc prog in 1st arg\n" if $ARGV[0] =~ /\A-/;
 
 my $gcc = shift(@ARGV);
-my $sysroot = '/tmp/sr'; # !! 
+#my $argv0 = readlink("/proc/self/exe");  # /usr/bin/perl, useless.
+my $prog0 = index($0, '/') < 0 ? "./$0" : $0;  # TODO(pts): $ENV{PATH} lookup.
+my $link0 = readlink($prog0);
+#die "$0: error: cannot readlink /proc/self/exe: $!\n" if !defined $link0;
+$prog0 = substr($link0, 0, 1) eq '/' ? $link0 :
+    substr($prog0, 0, rindex($prog0, '/') + 1) . $link0 if defined $link0;
+die "$0: error: prog not in bin: $prog0\n" if
+    $prog0 !~ m@(/bin/[^/]++)\Z(?!\n)@;
+my $sysroot = substr($prog0, 0, -length($1));
 {
   my $crt1_fn = "$sysroot/gccld/crt1.o";  # Other *crt*.o is also needed.
   die "$0: error: file not found: $crt1_fn\n" if !(-f $crt1_fn);
   my $ld_fn = "$sysroot/gccld/crt1.o";  # Other *crt*.o is also needed.
   die "$0: error: file not found: $ld_fn\n" if !(-f $ld_fn);
 }
+my $gcc_prog = $gcc;
+$gcc_prog =~ s@\A.*/@@s;
+my $need_nostdincxx = index($gcc_prog, '++') >= 0;
+if (!$need_nostdincxx) {  # Also detect `-x c++'.
+  my $i = 0;
+  for ($i = 0; $i < @ARGV and !$need_nostdincxx; ++$i) {
+    my $arg = $ARGV[$i];
+    if ($arg eq '-xc++') {
+      $need_nostdincxx = 1;
+    } elsif ($arg eq '-x' and $i < $#ARGV) {
+      $need_nostdincxx = 1 if $ARGV[++$i] eq 'c++';
+    } elsif (substr($arg, 0, 1) ne '-' and
+             $arg =~ /[.](?:cc|cp|cxx|cpp|CPP|c[+][+]|C)\Z(?!\n)/) {
+      $need_nostdincxx = 1;
+    }
+  }
+}
+
 # Our ld would be invoked because of -B.
 my @a = (
-    $gcc, '-m32', '-static', '--sysroot', $sysroot, "-B$sysroot/gccld", @ARGV);
+    $gcc, '-m32', '-static',
+    # Without -nostdinc++, /usr/include/c++/4.4/iostream would take precedence
+    # over $sysroot/usr/include/iostream.
+    $need_nostdincxx ? ('-nostdinc++') : (),
+    '--sysroot', $sysroot, "-B$sysroot/gccld", @ARGV);
 die "$0: error: exec $a[0]: $!\n" if !exec @a;
+# !! TODO(pts): unify script with ld

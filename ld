@@ -6,12 +6,22 @@
 use integer;
 use strict;
 
-die "$0: error: missing --sysroot=...\n" if
-    !@ARGV or $ARGV[0] !~ /\A--sysroot=(.*+)/;
-my $sysroot = $1;
+my $sysroot;
+if (@ARGV and $ARGV[0] =~ /\A--sysroot=(.*+)/) {
+  $sysroot = $1;
+  shift @ARGV;
+}
 #my $lgccld = "-L$sysroot/gccld";
 my $lgccld = "-L$0";
 die "$0: error: missing / in command name" if $lgccld !~ s@/[^/]++\Z(?!\n)@@;
+if (defined $sysroot) {
+  die "$0: error: lgccld mismatch: from_argv0=$lgccld, from_sysroot=-l$sysroot/gccld\n" if
+      "-L$sysroot/gccld" ne $lgccld;
+} else {
+  $sysroot = substr($lgccld, 2);
+  die "$0: error: trailing gccld expected: $sysroot\n" if
+      $sysroot !~ s@/gccld\Z(?!\n)@@;
+}
 
 my $is_static;
 my $i;
@@ -41,21 +51,32 @@ if (!defined $gccbdir) {  # Probably `gcc -nostdlib'.
 }
 
 # `ld -nostdlib' is different from `gcc -nostdlib'.
-my @a = ('ld', '-nostdlib');
+# Move our ($sysroot) lib directory to the front, before $gccbdir (with
+# libgcc.a).
+my @a = ('ld', '-nostdlib', "-L$sysroot/usr/lib");
+my $lsysrootusrlib = "-L$sysroot/usr/lib";
+my $lsysrootusrlibddlib = "-L$sysroot/usr/lib/../lib";
 for ($i = 1; $i < @ARGV; ++$i) {
   my $arg = $ARGV[$i];
-  if ($arg eq '--build-id' or
-      $arg eq '--hash-style=both' or
+  if ($arg eq '--xstatic-ld' or  # Just a marker.
+      $arg eq '--build-id' or  # Would increase file size.
+      $arg eq '--hash-style=both' or  # Would increase file size.
       $arg eq '-L/usr/lib' or
       $arg eq '-L/lib' or
       $arg eq '-L/usr/local/lib' or
       $arg eq $lgccld or
+      $arg eq $lsysrootusrlib or
+      $arg eq $lsysrootusrlibddlib or
       # -L/usr/lib/gcc/i486-linux-gnu/4.4.3/../../../../lib  # /usr/lib
       $arg =~ m@\A-L@ and $arg =~ m@/\.\./\.\./\.\./\.\./lib\Z(?!\n)@ or
       $arg =~ m@\A-L@ and $arg =~ m@/\.\./\.\./\.\.\Z(?!\n)@ or
      0) {
   } elsif ($arg eq '-z' and $i + 1 < @ARGV and $ARGV[$i + 1] eq 'relro') {
+    # Would increase file size.
     ++$i;
+  } elsif ($arg eq '-lstdc++') {
+    # Fixup for linker errors: undefined reference to `_Unwind_SjLj_Unregister'.
+    push @a, $arg, '-lstdc++usjlj';  # The order is important.
   } else {
     push @a, $arg;
   }
@@ -67,5 +88,5 @@ if (-f "$gccbdir/ld") {
   $a[0] = "$gccbdir/ld";  # Override 'ld' (on $PATH).
 }
 
-#print STDERR "running linker: @a\n";
+print STDERR "running linker: @a\n";
 die "$0: error: exec $a[0]: $!\n" if !exec @a;
