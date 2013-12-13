@@ -1,7 +1,6 @@
 #! /usr/bin/perl -w
 # by pts@fazekas.hu at Thu Dec 12 23:38:13 CET 2013
 #
-# TODO(pts): Add Clang support.
 # TODO(pts): Add magic Perl header, then convert to C.
 # TODO(pts): Document new conditions in usr/include/bits/cpp_type_traits.h
 #            and usr/include/limits
@@ -29,9 +28,9 @@ use integer;
 use strict;
 
 sub run_xstatic() {
-  die "Usage: $0 <gcc> [<gcc-arg>...]
-  Invokes gcc -static against the xstatic uClibc.
-  " if !@ARGV or $ARGV[0] eq '--help';
+  die "Usage: $0 <gcc|g++> [<gcc-arg>...]
+Invokes gcc -static against the xstatic uClibc.
+" if !@ARGV or $ARGV[0] eq '--help';
   die "$0: error: please specify gcc prog in 1st arg\n" if $ARGV[0] =~ /\A-/;
 
   my $gcc = shift(@ARGV);
@@ -59,6 +58,15 @@ sub run_xstatic() {
       my $arg = $ARGV[$i];
       if ($arg eq '-xc++') {
         $need_nostdincxx = 1;
+      } elsif ($arg eq '-ccc-cxx') {  # Enable C++ for clang.
+        $need_nostdincxx = 1;
+        # !! better autodetect clang++ (needed?)
+        # !! verify no system includes
+        # !! why is clang 767752 bytes vs g++ 522096 bytes for hello.cc?
+        #    !! strip removes it after clang, but why doesn't ld remove it?
+        #    !! even -Wl,S doesn't help
+        #    !! same for hello.c, strip removes some bytes
+        #       how is pts-clang-xstatic different?
       } elsif ($arg eq '-x' and $i < $#ARGV) {
         $need_nostdincxx = 1 if $ARGV[++$i] eq 'c++';
       } elsif (substr($arg, 0, 1) ne '-' and
@@ -173,6 +181,14 @@ sub run_ld() {
     } elsif ($arg eq '-lstdc++') {
       # Fixup for linker errors: undefined reference to `_Unwind_SjLj_Unregister'.
       push @a, $arg, '-lstdc++usjlj';  # The order is important.
+    } elsif ($arg eq 'crtbegin.o' or  # !! only clang needs it, from cross-compiler
+             $arg eq 'crtbeginT.o' or 
+             $arg eq 'crtbeginS.o' or
+             $arg eq 'crtend.o' or
+             $arg eq 'crtendS.o' or
+             $arg eq 'crtfastmath.o') {
+      push @a, "$sysroot/libgcc/$arg";
+      push @a, "-L$sysroot/libgcc";  # !! do it once only
     } else {
       push @a, $arg;
     }
