@@ -79,7 +79,7 @@ int main(int argc, char **argv) {
   /* RPATH=$ORIGIN/../binlib (set manually in clang.bin) takes care of this */
   /* in clang.bin /proc/self/exE was modified to /proc/self/exe */
   /* Needed so ld0.so doesn't consult /etc/ld.so.cache */
-  putenv("LD_LIBRARY_PATH=/dev/null/missing");
+  putenv("LD0LIBRARY_PATH=/dev/null/missing");
   /* clang was doing:
    * readlink("/proc/self/exe", ".../clang/binlib/ld-linux.so.2", ...)
    * ... and believed it's ld-linux.so.2. I edited the binary to /proc/self/exE
