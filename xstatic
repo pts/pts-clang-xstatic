@@ -8,6 +8,14 @@ eval '(exit $?0)' && eval 'PERL_BADLANG=x;PATH="$PATH:.";export PERL_BADLANG\
 # by pts@fazekas.hu at Thu Dec 12 23:38:13 CET 2013
 #
 # TODO(pts): Write README.txt for all 3 projects.
+# TODO(pts): Upgrade the pts-clang-xstatic linker? It seems to work fine.
+# TODO(pts): Document new conditions in usr/include/bits/cpp_type_traits.h
+#            and usr/include/limits and other libstdc++ changes.
+# TODO(pts): Rewrite xstatic in C once we have Clang support.
+# TODO(pts): Test non-xstatic exception handling in many g++ and Clang versions.
+#
+# New binutils compile:
+#
 # TODO(pts): bug: unexpected reloc type in static binarySegmentation fault (core dumped)
 #            .../bin/clang++ -static -m64 -s -O2 -fno-exceptions ~/prg/hello.cc
 #            (doesn't happen if `-static' without `-s', and we strip later)
@@ -15,17 +23,9 @@ eval '(exit $?0)' && eval 'PERL_BADLANG=x;PATH="$PATH:.";export PERL_BADLANG\
 #            (64-bit)
 #            Try upgrading ld from: GNU ld (GNU Binutils for Ubuntu) 2.20.1-system.20100303
 #            to: GNU ld (GNU Binutils for Ubuntu) 2.22
-# TODO(pts): !! clang-xstatic uses its own ld now, how if not in bin?
-#            (would find it in bin) bin would be searched first, no on $PATH
 # TODO(pts): compile a smaller linker (maybe no cross-compilation support?)
 # TODO(pts): use ld.bin in bin
 # TODO(pts): add ar, randlib, strip.
-# TODO(pts): Make the `ld' Perl script just a symlink.
-# TODO(pts): Document new conditions in usr/include/bits/cpp_type_traits.h
-#            and usr/include/limits and other libstdc++ changes.
-# TODO(pts): Rewrite ld Perl script in C once we have Clang support.
-# TODO(pts): Rewrite in C once we have Clang support.
-# TODO(pts): Test exception handling in various g++ and Clang versions.
 #
 # Tested and found working with GCC (both gcc and g++) versions: 4.4.3 on
 # Ubuntu Lucid, 4.6.2 on Ubuntu Precise and
@@ -137,8 +137,8 @@ Invokes gcc -static against the xstatic uClibc.
       '-fno-stack-protector',
       $need_linker ? (  # `clang -c' warns about these flags.
         '-Wl,--xstatic-ld',
-        '-Wl,' . $prog0,
         '-Wl,' . $has_v,
+        # TODO(pts): Experiment with passing $sysroot in $0, from clang.
         '-Wl,' . $sysroot) : (),
       $is_cxx && !$has_nostdincxx ? (
           # Without -nostdinc++, /usr/include/c++/4.4/iostream would take
@@ -156,12 +156,21 @@ Invokes gcc -static against the xstatic uClibc.
 }
 
 sub run_ld() {
-  my $is_static;
   my $i;
-  my $gccbdir;
+  my $is_verbose;
   my $sysroot;
+  for ($i = 0; $i < @ARGV; ++$i) {
+    my $arg = $ARGV[$i];
+    if ($arg eq '--xstatic-ld' and $i + 2 < @ARGV) {
+      $is_verbose = $ARGV[++$i] + 0;
+      $sysroot = $ARGV[++$i];
+      last;
+    }
+  }
+  die "$0: error: --xstatic-ld flag not found\n" if !defined($sysroot);
+  my $is_static;
+  my $gccbdir;
   my $sysroot_arg;
-  my $is_verbose = 0;
   for ($i = 0; $i < @ARGV; ++$i) {
     my $arg = $ARGV[$i];
     if ($arg eq '-static') {
@@ -172,9 +181,6 @@ sub run_ld() {
     } elsif ($arg =~ /\A--sysroot=(.*+)/s) {
       die "$0: error: multiple --sysroot args\n" if defined $sysroot_arg;
       $sysroot_arg = $1;
-    } elsif ($arg eq '--do-xstatic-ld' and $i + 2 < @ARGV) {
-      $is_verbose = $ARGV[++$i];
-      $sysroot = $ARGV[++$i];
     # /usr/lib/gcc/i486-linux-gnu/4.4.3/crtbeginT.o
     # There is crtbeginT.o, crtbeginS.o and crtbegin.o. When building static
     # executables, crtbeginT.o is used.
@@ -182,7 +188,6 @@ sub run_ld() {
       $gccbdir = substr($arg, 0, -length($1));
     }
   }
-  die "$0: error: missing --do-xstatic-ld\n" if !defined($sysroot);
   die "$0: error: missing -static\n" if !$is_static;
   die "$0: error: sysroot mismatch: do=($sysroot) arg=($sysroot_arg)\n" if
       defined($sysroot_arg) and $sysroot_arg ne $sysroot;
@@ -211,7 +216,7 @@ sub run_ld() {
   my $has_nodir_crt = 0;
   for ($i = 0; $i < @ARGV; ++$i) {
     my $arg = $ARGV[$i];
-    if ($arg eq '--do-xstatic-ld' and $i + 2 < @ARGV) {  # A marker with arg.
+    if ($arg eq '--xstatic-ld' and $i + 2 < @ARGV) {  # Processed way above.
       $i += 2;
     } elsif ($arg eq '--sysroot' and $i < $#ARGV) {
       ++$i;
@@ -264,8 +269,8 @@ sub run_ld() {
 }
 
 # When gcc runs ld (as collect2), the -Wl,... flags are not passed at the
-# front.
-if (@ARGV and $ARGV[0] eq '--do-xstatic-ld') {
+# front, so we have to look for --xstatic-ld in each arg.
+if (grep { $_ eq '--xstatic-ld' } @ARGV) {
   run_ld();
 } else {
   run_xstatic();
