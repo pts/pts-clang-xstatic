@@ -1,67 +1,14 @@
 #define ALONE \
     set -ex; exec ${CC:-gcc} -s -Os -fno-stack-protector \
     -W -Wall -o clang_xstatic "$0"; exit 1
-
 /*
- * clang.c: clang trampoline for .so file redirection and -static linking
+ * clang_xstatic.c: clang trampoline for .so file redir and -static linking
  * by pts@fazekas.hu at Fri Dec 13 22:17:42 CET 2013
+ *
+ * Since our process is short-lived, we don't bother free()ing memory.
  */
 
-#define _GNU_SOURCE 1  /* Needed for get_current_dir_name() */
-#include <stdlib.h>
-#include <string.h>
-#include <sys/types.h>
-#include <unistd.h>
-
-static char *strdupcat(const char *a, const char *b, const char *c) {
-  const size_t sa = strlen(a), sb = strlen(b), sc = strlen(c);
-  char *p = malloc(sa + sb + sc + 1);
-  memcpy(p, a, sa);
-  memcpy(p + sa, b, sb);
-  strcpy(p + sa + sb, c);
-  return p;
-}
-
-static char *readlink_alloc(const char *path) {
-  ssize_t len = 256;
-  ssize_t got;
-  char *buf = malloc(len);
-  for (;;) {
-    if (0 > (got = readlink(path, buf, len))) {
-      free(buf);
-      return NULL;
-    }
-    if (got < len) {
-      buf[got] = '\0';
-      return buf;
-    }
-    buf = realloc(buf, len <<= 1);
-  }
-}
-
-/** Resolve symlinks until a non-symlink is found. */
-static char *readlink_alloc_all(const char *path) {
-  char *path2, *path1 = strdup(path);
-  while ((path2 = readlink_alloc(path1))) {
-    if (path2[0] != '/') {
-      char *p;
-      for (p = path1 + strlen(path1); p != path1 && p[-1] != '/'; --p) {}
-      if (p != path1) {
-        *p = '\0';  /* Remove basename from path1. */
-        p = strdupcat(path1, "", path2);
-        free(path2);
-        path2 = p;
-      }
-    }
-    free(path1);
-    path1 = path2;
-  }
-  return path1;
-}
-
-static char *path_join(char *a, char *b) {
-  return !a ? b : (b[0] == '/') ? strdupcat("", "", b) : strdupcat(a, "/", b);
-}
+#include "clang_common.ci"
 
 int main(int argc, char **argv) {
   char *prog;
@@ -104,6 +51,7 @@ int main(int argc, char **argv) {
     ++argv;
     --argc;
     /* When adding more arguments here, increase the args malloc count. */
+    /* We don't need get_autodetect_archflag(argv), we always send "-m32". */
     *argp++ = "-m32";
     *argp++ = "-static";
     /* TODO(pts): Get rid of this warning if compiling only .o files:

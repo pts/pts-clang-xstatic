@@ -24,3 +24,4 @@ TODOs:
 
 * TODO(pts): Autodetect 3.3 in the clang cur symlink
 * TODO(pts): Recompile or relink Clang 3.3 statically.
+# TODO(pts): Make clang not open /etc/lsb-release (DetectDistro, impossible).
