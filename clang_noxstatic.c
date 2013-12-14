@@ -97,6 +97,24 @@ int main(int argc, char **argv) {
      */
     *argp++ = path_join(get_current_dir_name(), argv[0]);
   }
+  /* clang calls itself with the -cc1 flag. Don't modify the argv then. */
+  if (!argv[1] || 0 != strcmp(argv[1], "-cc1")) {
+    char need_linker = 1;
+    char **argi, *arg, c;
+    for (argi = argv + 1; (arg = *argi); ++argi) {
+      if (arg[0] != '-') continue;
+      c = arg[1];
+      /* E.g. with "-E" the linker won't be invoked. */
+      if ((c == 'M' && arg[2] == 'M' && arg[3] == '\0') ||
+          ((c == 'E' || c == 'S' || c == 'c' || c == 'M') && arg[2] == '\0')) {
+        need_linker = 0;
+      }
+    }
+    /* If !need_linker, avoid clang warning about unused linker input. */
+    if (need_linker) {
+      *argp++ = "-Wl,-nostdlib";  /* -L/usr and equivalents added by clang. */
+    }
+  }
   memcpy(argp, argv + 1, argc * sizeof(*argp));
   ldso0 = strdupcat(dir, "/../binlib/ld0.so", "");
   execv(ldso0, args);

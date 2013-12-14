@@ -39,7 +39,7 @@ int main(int argc, char **argv) {
   char **args, **argp, *arg;
   char *argv0 = argv[0], *prog;
 
-  argp = args = malloc(sizeof(*args) * (argc + 1));
+  argp = args = malloc(sizeof(*args) * (argc + 2));
   *argp++ = *argv++;
   for (; (arg = *argv); ++argv) {
     if (0 == strcmp(arg, "-z") && argv[1] && 0 == strcmp(argv[1], "relro")) {
