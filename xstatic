@@ -19,7 +19,7 @@ eval '(exit $?0)' && eval 'PERL_BADLANG=x;PATH="$PATH:.";export PERL_BADLANG\
 #            (would find it in bin) bin would be searched first, no on $PATH
 # TODO(pts): compile a smaller linker (maybe no cross-compilation support?)
 # TODO(pts): use ld.bin in bin
-# TODO(pts): Add gnu/stubs-64.h for 64-bit compilation on narancs.
+# TODO(pts): add ar, randlib, strip.
 # TODO(pts): Make the `ld' Perl script just a symlink.
 # TODO(pts): Document new conditions in usr/include/bits/cpp_type_traits.h
 #            and usr/include/limits and other libstdc++ changes.
@@ -120,6 +120,11 @@ Invokes gcc -static against the xstatic uClibc.
   # Precise so that the right crt1.o gets found.
   #
   # TODO(pts): Detect wrong crt1.o (in /usr/lib/i386-linux-gnu etc.).
+  #
+  # `xstatic ~/d/clang/bin/clang -print-search-dirs' doesn't print
+  # `/home/pts/bin.local/../prg/xstatic/gccld', but
+  # `xstatic ~/d/clang/bin/clang -print-prog-name=ld' prints
+  # `/home/pts/bin.local/../prg/xstatic/gccld/ld'.
   my @a = (
       $gcc, '-static',
       # In Clang, -m32 has higher priority than `-target'. So don't specify
