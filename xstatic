@@ -47,8 +47,8 @@ use integer;
 use strict;
 
 sub run_xstatic() {
-  die "Usage: $0 <gcc|g++> [<gcc-arg>...]
-Invokes gcc -static against the xstatic uClibc.
+  die "Usage: $0 <gcc|g++|clang|clang++> [<compiler-arg>...]
+Invokes the C/C++ compiler with -static against the xstatic uClibc.
 " if !@ARGV or $ARGV[0] eq '--help';
   die "$0: error: please specify gcc prog in 1st arg\n" if $ARGV[0] =~ /\A-/;
 
