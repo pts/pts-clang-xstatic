@@ -35,7 +35,7 @@ int main(int argc, char **argv) {
    * ... and believed it's ld-linux.so.2. I edited the binary to /proc/self/exE
    * to fix it.
    */
-  argp = args = malloc(sizeof(*args) * (argc + 11));
+  argp = args = malloc(sizeof(*args) * (argc + 12));
   *argp++ = argv[0];  /* No effect, will be ignored. */
   /* TODO(pts): Make clang.bin configurable. */
   *argp++ = prog = strdupcat(dir, "/clang.bin", "");
@@ -51,6 +51,7 @@ int main(int argc, char **argv) {
   if (!argv[1] || 0 != strcmp(argv[1], "-cc1")) {
     char need_linker = 1;
     char **argi, *arg, c;
+    archbit_t archbit, archbit_override;
     for (argi = argv + 1; (arg = *argi); ++argi) {
       if (arg[0] != '-') continue;
       c = arg[1];
@@ -64,11 +65,26 @@ int main(int argc, char **argv) {
     if (need_linker) {
       *argp++ = "-Wl,-nostdlib";  /* -L/usr and equivalents added by clang. */
     }
-    p = get_autodetect_archflag(argv);
-    if (p) *argp++ = p;
+    archbit = get_archbit_detected(argv);
+    archbit_override = get_archbit_override(archbit);
+    if (archbit_override == ARCHBIT_32) {
+      *argp++ = "-m32";
+      archbit = ARCHBIT_32;
+    } else if (archbit_override == ARCHBIT_64) {
+      *argp++ = "-m64";
+      archbit = ARCHBIT_64;
+    }
+    if (archbit == ARCHBIT_64) {
+      /* Let the compiler find our replacement for gnu/stubs-64.h on 32-bit
+       * systems which don't provide it.
+       */
+      *argp++ = "-idirafter";  /* Add with low priority. */
+      *argp++ = strdupcat(dir, "/../include64low", "");
+    }
   }
   memcpy(argp, argv + 1, argc * sizeof(*argp));
   ldso0 = strdupcat(dir, "/../binlib/ld0.so", "");
+  /* TODO(pts): If -v specified, print the command we run */
   execv(ldso0, args);
   p = strdupcat("error: clang: exec failed: ", prog, "\n");
   (void)!write(2, p, strlen(p));

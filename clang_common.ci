@@ -57,20 +57,44 @@ static char *path_join(char *a, char *b) {
   return !a ? b : (b[0] == '/') ? strdupcat("", "", b) : strdupcat(a, "/", b);
 }
 
-/** Returns "-m64", "-m32" or NULL. -m32 is not needed, because that's the
- * default for our clang.
- */
-static char *get_autodetect_archflag(char **argv) {
+typedef enum archbit_t {
+  ARCHBIT_UNKNOWN = -1,
+  ARCHBIT_UNSPECIFIED = -2,
+  ARCHBIT_DETECTED = -3,
+  ARCHBIT_32 = 32,
+  ARCHBIT_64 = 64,
+} archbit_t;
+
+static archbit_t get_archbit_detected(char **argv) {
   char **argi, *arg;
-  struct utsname ut;
   for (argi = argv + 1; (arg = *argi); ++argi) {
-    if (0 == strcmp(arg, "-target") ||
-        0 == strcmp(arg, "-m32") || 0 == strcmp(arg, "-m64") ||
-        0 == strncmp(arg, "-march=", 7) || 0 == strncmp(arg, "-mcpu=", 6)) {
-      return NULL;  /* Found an explicit target, no autodetection. */
+    /* TODO(pts): Support Clang >3.3 flag `-arch i386'. */
+    /* Please note that -march=k8 doesn't force 64-bit compilation mode. */
+    /* Please note that we ignore -mcpu=, -march= and -mtune=, because neither
+     * Clang nor GCC autoswitch from -m32 to -m64 just by -march=k8.
+     */
+    /* gcc: `-mcpu=' is deprecated. Use `-mtune=' or '-march=' instead. */
+    if (0 == strcmp(arg, "-target") && argv[1]) {  /* Clang. */
+      /* -target=... doesn't work in Clang, so we don't match it. */
+      const char *p;
+      for (p = argv[1]; *p != '-' && *p != '\0'; ++p) {
+        /* Matches amd64 and x86_64. */
+        if (p[0] == '6' && p[1] == '4') return ARCHBIT_64;
+      }
+      return ARCHBIT_32;
+    } else if (0 == strcmp(arg, "-m32")) {
+      return ARCHBIT_32;
+    } else if (0 == strcmp(arg, "-m64")) {
+      return ARCHBIT_64;
     }
   }
-  if (uname(&ut) < 0) return NULL;
+  return ARCHBIT_UNSPECIFIED;
+}
+
+static archbit_t get_archbit_override(archbit_t archbit_detected) {
+  struct utsname ut;
+  if (archbit_detected >= 0) return ARCHBIT_DETECTED;
+  if (uname(&ut) < 0) return ARCHBIT_DETECTED;
   if (strstr(ut.machine, "64")) {  /* 64-bit kernel. */
     /* Since nowadays there isn't anything useful in /lib directly, let's
      * see if /bin/sh is a 64-bit ELF executable.
@@ -78,14 +102,14 @@ static char *get_autodetect_archflag(char **argv) {
     int fd = open("/bin/sh", O_RDONLY);
     int got;
     char buf[5];
-    if (fd < 0) return NULL;
+    if (fd < 0) return ARCHBIT_DETECTED;
     if ((got = read(fd, buf, 5)) < 5) {
       close(fd);
-      return NULL;
+      return ARCHBIT_DETECTED;
     }
     close(fd);
     /* 64-bit ELF binary. */
-    if (0 == memcmp(buf, "\177ELF\002", 5)) return "-m64";
+    if (0 == memcmp(buf, "\177ELF\002", 5)) return ARCHBIT_64;
   }
-  return "-m32";
+  return ARCHBIT_32;
 }
