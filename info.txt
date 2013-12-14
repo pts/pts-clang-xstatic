@@ -12,10 +12,15 @@ Modifications of the clang+llvm-3.3-i386-debian6.tar.bz2 download:
 * added binlib from Ubuntu Lucid
 * added bin/clang trampoline binary
 * added xstatic/i486-linux-gnu/bin/ld trampoline binary
+* added linker
+* added ld0.so
+* renamed rpath directory
+
+Info:
+
+* clang doesn't add C++ header directories when compiling C code.
 
 TODOs:
 
-* TODO(pts): Do we need collect2 for constructors? gcc calls collect2.
-* TODO(pts): Remove the lib/ld-linux.so.2 symlink, and make the
-  binlib/ld-linux.so.2 work when clang.bin executes itself.
-* TODO(pts): autodetect 3.3 in the clang cur symlink
+* TODO(pts): Autodetect 3.3 in the clang cur symlink
+* TODO(pts): Recompile or relink Clang 3.3 statically.
