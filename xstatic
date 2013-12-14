@@ -1,13 +1,31 @@
 #! /usr/bin/perl -w
 # by pts@fazekas.hu at Thu Dec 12 23:38:13 CET 2013
 #
-# TODO(pts): Add magic Perl header, then convert to C.
+# TODO(pts): bug: unexpected reloc type in static binarySegmentation fault (core dumped)
+#            .../bin/clang++ -static -m64 -s -O2 -fno-exceptions ~/prg/hello.cc
+#            (doesn't happen if `-static' without `-s', and we strip later)
+#            doesn't happen on Ubuntu Lucid (32-bit); happens on Ubuntu Precise
+#            (64-bit)
+#            Try upgrading ld from: GNU ld (GNU Binutils for Ubuntu) 2.20.1-system.20100303
+#            to: GNU ld (GNU Binutils for Ubuntu) 2.22
+# TODO(pts): !! clang-xstatic uses its own ld now, how if not in bin?
+#            (would find it in bin) bin would be searched first, no on $PATH
+# TODO(pts): compile a smaller linker (maybe no cross-compilation support?)
+# TODO(pts): use ld.bin in bin
+# TODO(pts): do `clang -m64' by default on 64-bit? `gcc -v' prints
+#            `Target: x86_64-linux-gnu', but can we detect it? Detect /bin/sh
+#            as a 64-bit ELF and `uname -m' or `uname -p' (unknown in busybox)
+#            as x86_64?
+#            This has to be implemented in clang_noxstatic.c.
+# TODO(pts): Add gnu/stubs-64.h for 64-bit compilation on narancs.
+# TODO(pts): Make `ld' Perl script just a symlink.
+# TODO(pts): Add pathbin directory with symlinks, document i
+# TODO(pts): Add magic Perl header.
 # TODO(pts): Document new conditions in usr/include/bits/cpp_type_traits.h
 #            and usr/include/limits
 # TODO(pts): Rewrite ld Perl script in C once we have Clang support.
 # TODO(pts): Rewrite in C once we have Clang support.
-# TODO(pts): Test exception handling in various g++ versions.
-# TODO(pts): Recompile Clang 3.3. statically.
+# TODO(pts): Test exception handling in various g++ and Clang versions.
 #
 # Tested and found working with GCC (both gcc and g++) versions: 4.4.3 on
 # Ubuntu Lucid, 4.6.2 on Ubuntu Precise and
@@ -52,29 +70,47 @@ Invokes gcc -static against the xstatic uClibc.
   }
   my $gcc_prog = $gcc;
   $gcc_prog =~ s@\A.*/@@s;
-  my $need_nostdincxx = index($gcc_prog, '++') >= 0;
-  if (!$need_nostdincxx) {  # Also detect `-x c++'.
-    my $i = 0;
-    for ($i = 0; $i < @ARGV and !$need_nostdincxx; ++$i) {
-      my $arg = $ARGV[$i];
-      if ($arg eq '-xc++') {
-        $need_nostdincxx = 1;
-      } elsif ($arg eq '-ccc-cxx') {  # Enable C++ for Clang.
-        # -ccc-cxx is a Clang-specific flag, gcc doesn't have it.
-        $need_nostdincxx = 1;
-        # !! better autodetect C++ clang++ (needed?)
-        # !! verify no system includes
-      } elsif ($arg eq '-x' and $i < $#ARGV) {
-        $need_nostdincxx = 1 if $ARGV[++$i] eq 'c++';
-      } elsif (substr($arg, 0, 1) ne '-' and
-               $arg =~ /[.](?:cc|cp|cxx|cpp|CPP|c[+][+]|C)\Z(?!\n)/) {
-        $need_nostdincxx = 1;
-      }
+  my $is_cxx = index($gcc_prog, '++') >= 0 ? 1 : 0;
+  my $is_clang = index($gcc_prog, 'clang') >= 0 ? 1 : 0;
+  my $has_nostdincxx = 0;
+  my $has_explicit_target = 0;
+  my $i = 0;
+  for ($i = 0; $i < @ARGV; ++$i) {
+    my $arg = $ARGV[$i];
+    if ($arg eq '-xc++') {
+      $is_cxx = 1;
+    } elsif ($arg eq '-ccc-cxx') {  # Enable C++ for Clang.
+      # -ccc-cxx is a Clang-specific flag, gcc doesn't have it.
+      $is_cxx = 1;
+      $is_clang = 1;
+    } elsif ($arg eq '-x' and $i < $#ARGV) {
+      $is_cxx = 1 if $ARGV[++$i] eq 'c++';
+    } elsif ($arg eq '-nostdinc++') {
+      $has_nostdincxx = 1;
+    } elsif ($arg eq '-target' and $i < $#ARGV) {  # Clang-specific.
+      $has_explicit_target = 1;
+      ++$i;
+    } elsif ($arg eq '-m64') {
+      # xstatic can create 32-bit binaries only.
+      die "$0: error: flag not supported in xstatic: $arg\n";
+    } elsif ($arg eq '-shared' or $arg eq '-shared-libgcc') {
+      # xstatic cannot generate shared libraries.
+      die "$0: error: flag not supported in xstatic: $arg\n";
+    } elsif ($arg =~ /\A-mcpu=/ or $arg =~ /\A-march=/ or $arg eq '-m32') {
+      $has_explicit_target = 1;
+    } elsif ($arg =~ /\A-B/) {
+      die "$0: error: flag not supported in xstatic: -B\n";
+    } elsif ($arg =~ /\A--(sysroot|gcc-toolchain)(?![^=])/) {
+      # gcc-toolchain specifies too much (include, lib, tool etc.).
+      die "$0: error: flag not supported in xstatic: --$1\n";
+    } elsif ($arg !~ /\A-/ and
+             $arg =~ /[.](?:cc|cp|cxx|cpp|CPP|c[+][+]|C)\Z(?!\n)/) {
+      $is_cxx = 1;
     }
   }
   my $has_v = (grep { $_ eq '-v' } @ARGV) ? 1 : 0;
-  my $need_linker = (grep { $_ eq '-E' or $_ eq '-S' or $_ eq '-c' } @ARGV) ?
-      0 : 1;
+  my $need_linker = (grep { $_ eq '-E' or $_ eq '-S' or $_ eq '-c' or
+      $_ eq '-M' or $_ eq 'MM' } @ARGV) ? 0 : 1;
 
   # Our $sysroot/gccld/ld binary would be invoked because of -B. And that binary
   # would run us.
@@ -84,15 +120,29 @@ Invokes gcc -static against the xstatic uClibc.
   #
   # TODO(pts): Detect wrong crt1.o (in /usr/lib/i386-linux-gnu etc.).
   my @a = (
-      $gcc, '-m32', '-static',
+      $gcc, '-static',
+      # In Clang, -m32 has higher priority than `-target'. So don't specify
+      # ours if there is one already specified.
+      $has_explicit_target ? () : ('-m32'),
+      # Without this we get the following error compiling binutils 2.20.1:
+      # chew.c:(.text+0x233f): undefined reference to `__stack_chk_fail'
+      # We can't implement this in a compatible way, glibc gcc generates %gs:20,
+      # uClibc-0.9.33 has symbol __stack_chk_guard.
+      '-fno-stack-protector',
       $need_linker ? (  # `clang -c' warns about these flags.
         '-Wl,--xstatic-ld',
         '-Wl,' . $prog0,
         '-Wl,' . $has_v,
         '-Wl,' . $sysroot) : (),
-      # Without -nostdinc++, /usr/include/c++/4.4/iostream would take precedence
-      # over $sysroot/usr/include/iostream.
-      $need_nostdincxx ? ('-nostdinc++') : (),
+      $is_cxx && !$has_nostdincxx ? (
+          # Without -nostdinc++, /usr/include/c++/4.4/iostream would take
+          # precedence over $sysroot/usr/include/iostream.
+          '-nostdinc++',
+          # gcc doesn't have the -cxx-isystem flag, so `#include <vector>' would
+          # be found even if `gcc foo.c' includes it.
+          ($is_clang ? '-cxx-isystem' : '-isystem'),
+          "$sysroot/usr/c++include",
+      ) : (),
       '--sysroot', $sysroot, "-B$sysroot/gccld", @ARGV);
   # TODO(pts): Be smarter to detect no input files.
   @a = ($gcc, '-m32', '-static', @ARGV) if !@ARGV or ($ARGV[0] eq '-v');
@@ -142,8 +192,6 @@ sub run_ld() {
         last;
       }
     }
-    # !! for clang we'd find:
-    # /home/pts/bin.local/../prg/xstatic/usr/lib
     die "$0: error: cannot detect gcc built-in -B directory\n" if
         !defined($gccbdir);
   }
@@ -166,9 +214,10 @@ sub run_ld() {
         $arg eq '--build-id' or  # Would increase file size.
         $arg eq '--hash-style=both' or  # Would increase file size.
         $arg eq '--hash-style=gnu' or  # Seems to be unneeded.
-        $arg eq '-L/usr/lib' or
-        $arg eq '-L/lib' or
-        $arg eq '-L/usr/local/lib' or
+        $arg eq '-nostdlib' or  # Added above, no need to duplicate.
+        $arg eq '-L/usr/lib' or  # Usually added by clang.
+        $arg eq '-L/lib' or  # Usually added by clang.
+        $arg eq '-L/usr/local/lib' or  # Just for simplicity.
         $arg eq $lgccld or
         $arg eq $lgccldi or
         $arg eq $lsysrootusrlib or
