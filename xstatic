@@ -1,6 +1,13 @@
-#! /usr/bin/perl -w
+#! /bin/sh
+eval '(exit $?0)' && eval 'PERL_BADLANG=x;PATH="$PATH:.";export PERL_BADLANG\
+ PATH;exec perl -x -S -- "$0" ${1+"$@"};#'if 0;eval 'setenv PERL_BADLANG x\
+;setenv PATH "$PATH":.;exec perl -x -S -- "$0" $argv:q;#'.q
+#!perl -w
++push@INC,'.';$0=~/(.*)/s;do(index($1,"/")<0?"./$1":$1);die$@if$@__END__+if 0
+;#Don't touch/remove lines 1--7: http://www.inf.bme.hu/~pts/Magic.Perl.Header
 # by pts@fazekas.hu at Thu Dec 12 23:38:13 CET 2013
 #
+# TODO(pts): Write README.txt for all 3 projects.
 # TODO(pts): bug: unexpected reloc type in static binarySegmentation fault (core dumped)
 #            .../bin/clang++ -static -m64 -s -O2 -fno-exceptions ~/prg/hello.cc
 #            (doesn't happen if `-static' without `-s', and we strip later)
@@ -12,17 +19,10 @@
 #            (would find it in bin) bin would be searched first, no on $PATH
 # TODO(pts): compile a smaller linker (maybe no cross-compilation support?)
 # TODO(pts): use ld.bin in bin
-# TODO(pts): do `clang -m64' by default on 64-bit? `gcc -v' prints
-#            `Target: x86_64-linux-gnu', but can we detect it? Detect /bin/sh
-#            as a 64-bit ELF and `uname -m' or `uname -p' (unknown in busybox)
-#            as x86_64?
-#            This has to be implemented in clang_noxstatic.c.
 # TODO(pts): Add gnu/stubs-64.h for 64-bit compilation on narancs.
-# TODO(pts): Make `ld' Perl script just a symlink.
-# TODO(pts): Add pathbin directory with symlinks, document i
-# TODO(pts): Add magic Perl header.
+# TODO(pts): Make the `ld' Perl script just a symlink.
 # TODO(pts): Document new conditions in usr/include/bits/cpp_type_traits.h
-#            and usr/include/limits
+#            and usr/include/limits and other libstdc++ changes.
 # TODO(pts): Rewrite ld Perl script in C once we have Clang support.
 # TODO(pts): Rewrite in C once we have Clang support.
 # TODO(pts): Test exception handling in various g++ and Clang versions.
@@ -93,6 +93,7 @@ Invokes gcc -static against the xstatic uClibc.
     } elsif ($arg eq '-m64') {
       # xstatic can create 32-bit binaries only.
       die "$0: error: flag not supported in xstatic: $arg\n";
+      #$has_explicit_target = 1;  # Unnecessary here, not reached.
     } elsif ($arg eq '-shared' or $arg eq '-shared-libgcc') {
       # xstatic cannot generate shared libraries.
       die "$0: error: flag not supported in xstatic: $arg\n";
