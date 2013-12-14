@@ -86,6 +86,8 @@ int main(int argc, char **argv) {
     if (need_linker) {
       *argp++ = "-Wl,-nostdlib";  /* -L/usr and equivalents added by clang. */
     }
+    p = get_autodetect_archflag(argv);
+    if (p) *argp++ = p;
   }
   memcpy(argp, argv + 1, argc * sizeof(*argp));
   ldso0 = strdupcat(dir, "/../binlib/ld0.so", "");

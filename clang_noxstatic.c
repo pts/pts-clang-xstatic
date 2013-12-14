@@ -9,39 +9,6 @@
  */
 
 #include "clang_common.ci"
-
-/** Returns "-m64", "-m32" or NULL. -m32 is not needed, because that's the
- * default for our clang.
- */
-static char *get_autodetect_archflag(char **argv) {
-  char **argi, *arg;
-  struct utsname ut;
-  for (argi = argv + 1; (arg = *argi); ++argi) {
-    if (0 == strcmp(arg, "-target") ||
-        0 == strcmp(arg, "-m32") || 0 == strcmp(arg, "-m64") ||
-        0 == strncmp(arg, "-march=", 7) || 0 == strncmp(arg, "-mcpu=", 6)) {
-      return NULL;  /* Found an explicit target, no autodetection. */
-    }
-  }
-  if (uname(&ut) < 0) return NULL;
-  if (strstr(ut.machine, "64")) {  /* 64-bit kernel. */
-    /* Since nowadays there isn't anything useful in /lib directly, let's
-     * see if /bin/sh is a 64-bit ELF executable.
-     */
-    int fd = open("/bin/sh", O_RDONLY);
-    int got;
-    char buf[5];
-    if (fd < 0) return NULL;
-    if ((got = read(fd, buf, 5)) < 5) {
-      close(fd);
-      return NULL;
-    }
-    close(fd);
-    /* 64-bit ELF binary. */
-    if (0 == memcmp(buf, "\177ELF\002", 5)) return "-m64";
-  }
-  return "-m32";
-}
 int main(int argc, char **argv) {
   char *prog;
   char *ldso0;
