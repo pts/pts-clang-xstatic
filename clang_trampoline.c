@@ -208,6 +208,25 @@ static char is_dirprefix(const char *s, const char *prefix) {
       s[sprefix] == '\0' || s[sprefix] == '/');
 }
 
+static char is_argprefix(const char *s, const char *prefix) {
+  const size_t sprefix = strlen(prefix);
+  return 0 == strncmp(s, prefix, sprefix) && (
+      s[sprefix] == '\0' || s[sprefix] == '=');
+}
+
+static void check_bflags(char **argv) {
+  char **argi, *arg;
+  for (argi = argv + 1; (arg = *argi); ++argi) {
+    if ((arg[0] == '-' && arg[1] == 'B') ||
+        is_argprefix(arg, "--sysroot") ||
+        is_argprefix(arg, "--gcc-toolchain")) {
+      fdprint(2, strdupcat(
+          "error: flag not supported in this ldmode: ", arg, "\n"));
+      exit(123);
+    }
+  }
+}
+
 typedef enum ldmode_t {
   LM_XCLANGLD = 0,  /* Use the ld and -lgcc shipped with clang. */
   LM_XSYSLD = 1,
@@ -350,6 +369,7 @@ int main(int argc, char **argv) {
 #if USE_XSTATIC
   } else if (ldmode == LM_XSTATIC) {
     struct stat st;
+    check_bflags(argv);
     /* When adding more arguments here, increase the args malloc count. */
     /* We don't need get_autodetect_archflag(argv), we always send "-m32". */
     *argp++ = "-m32";
@@ -405,6 +425,8 @@ int main(int argc, char **argv) {
   } else {
     char need_linker = 1, c;
     archbit_t archbit, archbit_override;
+
+    check_bflags(argv);
     for (argi = argv + 1; (arg = *argi); ++argi) {
       if (arg[0] != '-') continue;
       c = arg[1];
