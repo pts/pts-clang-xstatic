@@ -184,6 +184,12 @@ static char *escape_argv(const char *prefix, char **argv, char *suffix) {
 static char detect_linker(char **argv) {
   char **argi, *arg;
   for (argi = argv + 1; (arg = *argi) &&
+       /* We could also use `-z relro' or `-m elf_i386' or ther values. */
+       0 != strcmp(arg, "--eh-frame-hdr") &&  /* By clang. */
+       0 != strcmp(arg, "--build-id") &&  /* By clang and gcc. */
+       0 != strncmp(arg, "--hash-style=", 13) &&
+       0 != strcmp(arg, "--do-xclangld") &&
+       0 != strcmp(arg, "-dynamic-linker") &&  /* By clang. */
        0 != strcmp(arg, "--start-group") &&  /* By gcc/clang -static. */
        0 != strcmp(arg, "--as-needed") &&  /* By gcc/clang witout -static. */
        0 != strcmp(arg, "--no-as-needed"); ++argi) {}
@@ -200,6 +206,12 @@ static char is_dirprefix(const char *s, const char *prefix) {
   return 0 == strncmp(s, prefix, p - prefix) && (*p == '\0' || *p == '/');
 }
 
+typedef enum ldmode_t {
+  LM_XCLANGLD = 0,  /* Use the ld and -lgcc shipped with clang. */
+  LM_XSYSLD = 1,
+  LM_XSTATIC = 2,
+} ldmode_t;
+
 int main(int argc, char **argv) {
   char *prog, *ldso0, *argv0;
   char *dir = argv[0][0] == '\0' ? strdup("x") : strdup(readlink_alloc_all(
@@ -208,7 +220,7 @@ int main(int argc, char **argv) {
   char **args, **argp;
   const char *febemsg = "frontend";  /* Or "backend". */
   char is_verbose = 0;
-  char is_xstatic = 0;
+  ldmode_t ldmode;
   char **argi, *arg;
   for (p = dir + strlen(dir); p != dir && p[-1] != '/'; --p) {}
   if (p == dir) {
@@ -220,7 +232,7 @@ int main(int argc, char **argv) {
     /* Please note that we are only invoked for `clang -xstatic', because
      * without -xstatic, the ld symlink is outside of the clang program search
      * path, because -gcc-toolchain was not specified.
-     */ 
+     */
     /* All we do is exec()ing ld.bin with the following dropped from argv:
      *
      * -L/usr/lib...
@@ -230,24 +242,40 @@ int main(int argc, char **argv) {
      * -z relro (because it increases the binary size and it's useless for static)
      */
     argp = args = malloc(sizeof(*args) * (argc + 4));
-    *argp++ = argv0 = *argv++;
-    *argp++ = "-nostdlib";  /* No system directories to find .a files please. */
-    /* We put gccld with libgcc.a first, because clang puts
-     * /usr/lib/gcc/i486-linux-gnu/4.4 with libgcc.a before /usr/lib with
-     * libc.a .
-     */
-    *argp++ = strdupcat("-L", dir, "/../gccld");
-    *argp++ = strdupcat("-L", dir, "/../usr/lib");
-    for (; (arg = *argv); ++argv) {
-      if (0 == strcmp(arg, "-z") && argv[1] && 0 == strcmp(argv[1], "relro")) {
-        ++argv;  /* Skip and drop both arguments: -z relro */
-      } else if (0 != strcmp(arg, "--hash-style=both") &&
-          0 != strcmp(arg, "--build-id") &&
-          /* -L/usr/local/lib is not emitted by clang 3.3, but we play safe. */
-          !is_dirprefix(arg, "-L/usr/local/lib") &&
-          !is_dirprefix(arg, "-L/usr/lib") &&
-          !is_dirprefix(arg, "-L/lib")) {
-        *argp++ = *argv;
+    *argp++ = argv0 = *argv;
+    ldmode = LM_XSTATIC;
+    for (argi = argv + 1; (arg = *argi); ++argi) {
+      if (0 == strcmp(arg, "--do-xclangld")) {
+        ldmode = LM_XCLANGLD;
+      }
+    }
+    if (ldmode == LM_XCLANGLD) {
+      for (argi = argv + 1; (arg = *argi); ++argi) {
+        if (0 != strcmp(arg, "--do-xclangld")) {
+          *argp++ = *argi;
+        }
+      }
+    } else {  /* ldmode == LM_XSTATIC. */
+      *argp++ = "-nostdlib";  /* No system directories to find .a files. */
+      /* We put gccld with
+       libgcc.a first, because clang puts
+       * /usr/lib/gcc/i486-linux-gnu/4.4 with libgcc.a before /usr/lib with
+       * libc.a .
+       */
+      *argp++ = strdupcat("-L", dir, "/../gccld");
+      *argp++ = strdupcat("-L", dir, "/../usr/lib");
+      for (argi = argv + 1; (arg = *argi); ++argi) {
+        if (0 == strcmp(arg, "-z") &&
+            argi[1] && 0 == strcmp(argi[1], "relro")) {
+          ++argi;  /* Skip and drop both arguments: -z relro */
+        } else if (0 != strcmp(arg, "--hash-style=both") &&
+            0 != strcmp(arg, "--build-id") &&
+            /* -L/usr/local/lib is not emitted by clang 3.3; we play safe. */
+            !is_dirprefix(arg, "-L/usr/local/lib") &&
+            !is_dirprefix(arg, "-L/usr/lib") &&
+            !is_dirprefix(arg, "-L/lib")) {
+          *argp++ = *argi;
+        }
       }
     }
     *argp = NULL;
@@ -295,12 +323,19 @@ int main(int argc, char **argv) {
       (0 == strcmp(argv[1], "-xstatic") || 0 == strcmp(argv[1], "--xstatic"))) {
     ++argv;
     --argc;
-    is_xstatic = 1;
+    ldmode = LM_XSTATIC;
+  } else if (argv[1] &&
+      (0 == strcmp(argv[1], "-xsysld") || 0 == strcmp(argv[1], "--xsysld"))) {
+    ++argv;
+    --argc;
+    ldmode = LM_XSYSLD;
+  } else {
+    ldmode = LM_XCLANGLD;
   }
 #if USE_XSTATIC
   if (0) {
 #else
-  if (is_xstatic) {
+  if (ldmode == LM_XSTATIC) {
     fdprint(2, "error: flag not supported: -xstatic\n");
     exit(122);
 #endif
@@ -310,7 +345,7 @@ int main(int argc, char **argv) {
      */
     is_verbose = 0;
 #if USE_XSTATIC
-  } else if (is_xstatic) {
+  } else if (ldmode == LM_XSTATIC) {
     /* When adding more arguments here, increase the args malloc count. */
     /* We don't need get_autodetect_archflag(argv), we always send "-m32". */
     *argp++ = "-m32";
@@ -331,8 +366,8 @@ int main(int argc, char **argv) {
     *argp++ = strdupcat(dir, "/../usr/c++include", "");
     *argp++ = "-isystem";
     *argp++ = strdupcat(dir, "/../usr/include", "");
-    /* The linker would be ../xstatic/i486-linux-gnu/bin/ld, which is also
-     * a trampoline binary of ours.
+    /* The linker would be ../gccld/ld, which is also a trampoline binary of
+     * ours.
      */
     *argp++ = strdupcat("-B", dir, "/../gccld");
     /* Run `clang -print-search-dirs' to confirm that it was properly
@@ -353,12 +388,21 @@ int main(int argc, char **argv) {
         need_linker = 0;
       }
     }
+    if (ldmode == LM_XCLANGLD) {
+      /* Use libgcc.a, srtbegin*.o etc. from our clangld directory. */
+      *argp++ = strdupcat("-B", dir, "/../clangld");
+      *argp++ = "-static-libgcc";
+      if (need_linker) {
+        *argp++ = "-Wl,--do-xclangld";
+      }
+    } else {
+      if (need_linker) {
+        *argp++ = "-Wl,-nostdlib";  /* -L/usr and equivalents added by clang. */
+      }
+    }
     *argp++ = "-isystem";
     *argp++ = strdupcat(dir, "/../clanginclude", "");
     /* If !need_linker, avoid clang warning about unused linker input. */
-    if (need_linker) {
-      *argp++ = "-Wl,-nostdlib";  /* -L/usr and equivalents added by clang. */
-    }
     archbit = get_archbit_detected(argv);
     archbit_override = get_archbit_override(archbit);
     if (archbit_override == ARCHBIT_32) {
