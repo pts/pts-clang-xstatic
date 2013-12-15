@@ -225,9 +225,9 @@ int main(int argc, char **argv) {
      * --build-id (because not supported by old ld)
      * -z relro (because it increases the binary size and it's useless for static)
      */
-    argv0 = argv[0];
-    argp = args = malloc(sizeof(*args) * (argc + 2));
-    *argp++ = *argv++;
+    argp = args = malloc(sizeof(*args) * (argc + 3));
+    *argp++ = argv0 = *argv++;
+    *argp++ = "-nostdlib";  /* No system directories to find .a files please. */
     for (; (arg = *argv); ++argv) {
       if (0 == strcmp(arg, "-z") && argv[1] && 0 == strcmp(argv[1], "relro")) {
         ++argv;  /* Skip and drop both arguments: -z relro */
