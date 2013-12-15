@@ -5,8 +5,11 @@
     -W -Wall -DUSE_XSTATIC -o clang_xstatic "$0"; \
     exit 0
 /*
- * clang_trampline.c: clang trampoline for .so file redir and -static linking
+ * clang_trampline.c: clang and ld trampoline for .so file redir and -xstatic
  * by pts@fazekas.hu at Fri Dec 13 22:17:42 CET 2013
+ *
+ * This program examines its argv, modifies some args, and exec()s "clang.bin"
+ * or "ld.bin".
  *
  * Since our process is short-lived, we don't bother free()ing memory.
  */
@@ -177,9 +180,24 @@ static char *escape_argv(const char *prefix, char **argv, char *suffix) {
   return out;
 }
 
+/** Return true iff we've received a linker command-line. */
+static char detect_linker(char **argv) {
+  char **argi, *arg;
+  for (argi = argv + 1; (arg = *argi) &&
+       0 != strcmp(arg, "--start-group") &&  /* By gcc/clang -static. */
+       0 != strcmp(arg, "--as-needed") &&  /* By gcc/clang witout -static. */
+       0 != strcmp(arg, "--no-as-needed"); ++argi) {}
+  return ! !*argi;
+}
+
 static void fdprint(int fd, const char *msg) {
   const size_t smsg = strlen(msg);
   if (smsg != 0U + write(fd, msg, smsg)) exit(121);
+}
+
+static char is_dirprefix(const char *s, const char *prefix) {
+  const char const *p = prefix + strlen(prefix);
+  return 0 == strncmp(s, prefix, p - prefix) && (*p == '\0' || *p == '/');
 }
 
 int main(int argc, char **argv) {
@@ -198,6 +216,37 @@ int main(int argc, char **argv) {
   } else {
     p[-1] = '\0';
   }
+  if (detect_linker(argv)) {  /* clang runs as as ld. */
+    /* All we do is exec()ing ld.bin with the following dropped from argv:
+     *
+     * -L/usr/lib...
+     * -L/lib...
+     * --hash-style=both (because not supported by old ld)
+     * --build-id (because not supported by old ld)
+     * -z relro (because it increases the binary size and it's useless for static)
+     */
+    argv0 = argv[0];
+    argp = args = malloc(sizeof(*args) * (argc + 2));
+    *argp++ = *argv++;
+    for (; (arg = *argv); ++argv) {
+      if (0 == strcmp(arg, "-z") && argv[1] && 0 == strcmp(argv[1], "relro")) {
+        ++argv;  /* Skip and drop both arguments: -z relro */
+      } else if (0 != strcmp(arg, "--hash-style=both") &&
+          0 != strcmp(arg, "--build-id") &&
+          /* -L/usr/local/lib is not emitted by clang 3.3, but we play safe. */
+          !is_dirprefix(arg, "-L/usr/local/lib") &&
+          !is_dirprefix(arg, "-L/usr/lib") &&
+          !is_dirprefix(arg, "-L/lib")) {
+        *argp++ = *argv;
+      }
+    }
+    *argp = NULL;
+    prog = strdupcat(argv0, ".bin", "");  /* "ld.bin". */
+    execv(prog, args);
+    fdprint(2, strdupcat("error: clang-ld: exec failed: ", prog, "\n"));
+    return 120;
+  }
+
   /* RPATH=$ORIGIN/../binlib (set manually in clang.bin) takes care of this */
   /* in clang.bin /proc/self/exE was modified to /proc/self/exe */
   /* LD0LIBRARY_PATH is needed so ld0.so doesn't consult /etc/ld.so.cache.
