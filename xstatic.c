@@ -349,7 +349,7 @@ static void detect_lang(char **argv, lang_t *lang) {
     } else if (0 == strcmp(arg, "-x") && argi[1]) {
       lang->is_cxx = 0 == strcmp(*++argi, "c++");
     } else if (arg[0] != '-') {
-      for (ext = basename + strlen(basename); ext != arg && ext[-1] != '.';
+      for (ext = basename + strlen(basename); ext != basename && ext[-1] != '.';
            --ext) {}
       if (ext == basename) {
         ext = "";
