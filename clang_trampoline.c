@@ -1,9 +1,6 @@
 #define ALONE \
     set -ex; ${CC:-gcc} -s -Os -fno-stack-protector \
-    -W -Wall -o clang_noxstatic "$0"; \
-    ${CC:-gcc} -s -Os -fno-stack-protector \
-    -W -Wall -DUSE_XSTATIC -o clang_xstatic "$0"; \
-    exit 0
+    -W -Wall -o clang_trampoline "$0"; exit 0
 /*
  * clang_trampline.c: clang and ld trampoline for .so file redir and -xstatic
  * by pts@fazekas.hu at Fri Dec 13 22:17:42 CET 2013
@@ -373,14 +370,7 @@ int main(int argc, char **argv) {
   } else {
     ldmode = LM_XCLANGLD;
   }
-#if USE_XSTATIC
-  if (0) {
-#else
-  if (ldmode == LM_XSTATIC) {
-    fdprint(2, "error: flag not supported: -xstatic\n");
-    exit(122);
-#endif
-  } else if (!argv[1] || (!argv[2] && 0 == strcmp(argv[1], "-v"))) {
+  if (!argv[1] || (!argv[2] && 0 == strcmp(argv[1], "-v"))) {
     /* Don't add any flags, because the user wants some version info, and with
      * `-Wl,... -v' gcc and clang won't display version info.
      */
@@ -402,7 +392,6 @@ int main(int argc, char **argv) {
     }
   } else if (argv[1] && 0 == strcmp(argv[1], "--help")) {
     fdprint(1, "Additinal flags supported: -xstatic -xsysld\n");
-#if USE_XSTATIC
   } else if (ldmode == LM_XSTATIC) {
     struct stat st;
     char need_linker;
@@ -461,7 +450,6 @@ int main(int argc, char **argv) {
     if (need_linker && is_verbose) {
       *argp++ = "-Wl,--do-clangldv";
     }
-#endif
   } else if (argv[1] && 0 == strcmp(argv[1], "-cc1")) {
     febemsg = "backend";
   } else {
