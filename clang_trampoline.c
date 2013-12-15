@@ -413,21 +413,6 @@ int main(int argc, char **argv) {
         need_linker = 0;
       }
     }
-    if (ldmode == LM_XCLANGLD) {
-      /* Use libgcc.a, srtbegin*.o etc. from our clangld directory. */
-      *argp++ = strdupcat("-B", dir, "/../clangld");
-      *argp++ = "-static-libgcc";
-      if (need_linker) {
-        *argp++ = "-Wl,--do-xclangld";
-      }
-    } else {
-      if (need_linker) {
-        *argp++ = "-Wl,-nostdlib";  /* -L/usr and equivalents added by clang. */
-      }
-    }
-    *argp++ = "-isystem";
-    *argp++ = strdupcat(dir, "/../clanginclude", "");
-    /* If !need_linker, avoid clang warning about unused linker input. */
     archbit = get_archbit_detected(argv);
     archbit_override = get_archbit_override(archbit);
     if (archbit_override == ARCHBIT_32) {
@@ -437,6 +422,33 @@ int main(int argc, char **argv) {
       *argp++ = "-m64";
       archbit = ARCHBIT_64;
     }
+
+    if (ldmode == LM_XCLANGLD) {
+      /* Use libgcc.a, srtbegin*.o etc. from our clangld directory. */
+      if (archbit == ARCHBIT_64) {
+        /* Unfortunately it's not easy to give a helpful error message if
+         * /usr/lib/crt1.o is 32-bit and there is no 64-bit equivalent.
+         * Currently the first error is: `clangld64/crtbegin.o:
+         * incompatible target'.
+         * TODO(pts): In linker mode, check the 64-bitness of crt1.o and
+         * compatibility with `-m elf_x86_64'.
+         */
+        *argp++ = strdupcat("-B", dir, "/../clangld64");
+      } else {
+        *argp++ = strdupcat("-B", dir, "/../clangld32");
+      }
+      if (need_linker) {
+        *argp++ = "-static-libgcc";
+        *argp++ = "-Wl,--do-xclangld";
+      }
+    } else {
+      /* If !need_linker, avoid clang warning about unused linker input. */
+      if (need_linker) {
+        *argp++ = "-Wl,-nostdlib";  /* -L/usr and equivalents added by clang. */
+      }
+    }
+    *argp++ = "-isystem";
+    *argp++ = strdupcat(dir, "/../clanginclude", "");
     if (archbit == ARCHBIT_64) {
       /* Let the compiler find our replacement for gnu/stubs-64.h on 32-bit
        * systems which don't provide it.
