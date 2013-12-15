@@ -349,13 +349,10 @@ static void detect_lang(char **argv, lang_t *lang) {
     } else if (0 == strcmp(arg, "-x") && argi[1]) {
       lang->is_cxx = 0 == strcmp(*++argi, "c++");
     } else if (arg[0] != '-') {
-      for (ext = basename + strlen(basename); ext != basename && ext[-1] != '.';
+      for (ext = arg + strlen(arg);
+           ext != arg && ext[-1] != '.' && ext[-1] != '/';
            --ext) {}
-      if (ext == basename) {
-        ext = "";
-      } else {
-        --ext;
-      }
+      if (ext == basename) ext = "";
       if (0 == strcmp(ext, "cc") ||
           0 == strcmp(ext, "cp") ||
           0 == strcmp(ext, "cxx") ||
@@ -401,7 +398,6 @@ typedef enum ldmode_t {
 } ldmode_t;
 
 int main(int argc, char **argv) {
-  /* !! not probed yet */
   char *prog;
   char *dir, *dirup;
   char *p;
@@ -534,6 +530,9 @@ int main(int argc, char **argv) {
         "xstatic: error: compiler not found: ", argv[1], "\n"));
     return 119;
   }
+  argv[1] = argv[0];
+  ++argv;
+  --argc;
   /* !! are we able to use the clang trampoline */
   argp = args = malloc(sizeof(*args) * (argc + 17));
   *argp++ = prog;  /* Set destination argv[0]. */
@@ -549,6 +548,7 @@ int main(int argc, char **argv) {
     need_linker = detect_need_linker(argv);
     detect_nostdinc(argv, &has_nostdinc, &has_nostdincxx);
     detect_lang(argv, &lang);
+
     /* When adding more arguments here, increase the args malloc count. */
     /* We don't need get_autodetect_archflag(argv), we always send "-m32". */
     *argp++ = "-m32";
@@ -563,14 +563,18 @@ int main(int argc, char **argv) {
      * We can't implement this in a compatible way, glibc gcc generates %gs:20,
      * uClibc-0.9.33 has symbol __stack_chk_guard.
      */
-    *argp++ = "-fno-stack-protector";
+    if (lang.is_compiling) {  /* !! */
+      *argp++ = "-fno-stack-protector";
+    }
     /* The linker would be ../xstaticcld/ld, which is also a trampoline binary
      * of ours.
      */
     *argp++ = strdupcat("-B", dirup, "/xstaticcld");
     if (lang.is_compiling) {
       *argp++ = "-nostdinc";
-      *argp++ = "-nostdinc++";
+      if (lang.is_cxx) {
+        *argp++ = "-nostdinc++";
+      }
       if (!has_nostdinc) {
         *argp++ = "-isystem";
         p = strdupcat(dirup, "/clanginclude", "");
@@ -619,7 +623,7 @@ int main(int argc, char **argv) {
       }
     }
 
-    /* !! test with gcc and clang
+    /* !! test with gcc in addition to clang
      * In addition to -B, the gccld/i386-linux-gnu symlink is needed on Ubuntu
      * Precise so that the right crt1.o gets found.
      */

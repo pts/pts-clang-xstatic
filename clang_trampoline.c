@@ -227,10 +227,21 @@ static char is_argprefix(const char *s, const char *prefix) {
       s[sprefix] == '\0' || s[sprefix] == '=');
 }
 
-static void check_bflags(char **argv) {
+static char ends_with(const char *arg, const char *suffix) {
+  const size_t ssuffix = strlen(suffix);
+  const size_t sarg = strlen(arg);
+  return sarg >= ssuffix && 0 == strcmp(arg + sarg - ssuffix, suffix);
+}
+
+static char check_bflags(char **argv, char is_xstaticcld_ok) {
   char **argi, *arg;
+  char had_xstaticcld = 0;
   for (argi = argv + 1; (arg = *argi); ++argi) {
-    if ((arg[0] == '-' && arg[1] == 'B') ||
+    if (arg[0] == '-' && arg[1] == 'B' &&
+        is_xstaticcld_ok && ends_with(arg, "/xstaticcld")) {
+      had_xstaticcld = 1;
+    } else if (
+        (arg[0] == '-' && arg[1] == 'B') ||
         is_argprefix(arg, "--sysroot") ||
         is_argprefix(arg, "--gcc-toolchain")) {
       fdprint(2, strdupcat(
@@ -238,6 +249,7 @@ static void check_bflags(char **argv) {
       exit(122);
     }
   }
+  return had_xstaticcld;
 }
 
 static char detect_need_linker(char **argv) {
@@ -482,7 +494,7 @@ int main(int argc, char **argv) {
     struct stat st;
     char need_linker;
 
-    check_bflags(argv);
+    check_bflags(argv, 0);
     need_linker = detect_need_linker(argv);
     detect_nostdinc(argv, &has_nostdinc, &has_nostdincxx);
     /* When adding more arguments here, increase the args malloc count. */
@@ -565,7 +577,7 @@ int main(int argc, char **argv) {
     char need_linker;
     archbit_t archbit, archbit_override;
 
-    check_bflags(argv);
+    if (check_bflags(argv, ldmode == LM_XCLANGLD)) ldmode = LM_XSYSLD;
     need_linker = detect_need_linker(argv);
     detect_nostdinc(argv, &has_nostdinc, &has_nostdincxx);
     archbit = get_archbit_detected(argv);
