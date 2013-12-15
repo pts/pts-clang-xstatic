@@ -19,6 +19,7 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/utsname.h>
 #include <unistd.h>
@@ -222,6 +223,7 @@ int main(int argc, char **argv) {
   char is_verbose = 0;
   ldmode_t ldmode;
   char **argi, *arg;
+
   for (p = dir + strlen(dir); p != dir && p[-1] != '/'; --p) {}
   if (p == dir) {
     strcpy(dir, ".");
@@ -257,12 +259,12 @@ int main(int argc, char **argv) {
       }
     } else {  /* ldmode == LM_XSTATIC. */
       *argp++ = "-nostdlib";  /* No system directories to find .a files. */
-      /* We put gccld with
+      /* We put xstaticld with
        libgcc.a first, because clang puts
        * /usr/lib/gcc/i486-linux-gnu/4.4 with libgcc.a before /usr/lib with
        * libc.a .
        */
-      *argp++ = strdupcat("-L", dir, "/../gccld");
+      *argp++ = strdupcat("-L", dir, "/../xstaticld");
       *argp++ = strdupcat("-L", dir, "/../usr/lib");
       for (argi = argv + 1; (arg = *argi); ++argi) {
         if (0 == strcmp(arg, "-z") &&
@@ -346,6 +348,7 @@ int main(int argc, char **argv) {
     is_verbose = 0;
 #if USE_XSTATIC
   } else if (ldmode == LM_XSTATIC) {
+    struct stat st;
     /* When adding more arguments here, increase the args malloc count. */
     /* We don't need get_autodetect_archflag(argv), we always send "-m32". */
     *argp++ = "-m32";
@@ -358,18 +361,40 @@ int main(int argc, char **argv) {
     *argp++ = "-nostdinc";
     *argp++ = "-nostdinc++";
     *argp++ = "-isystem";
-    *argp++ = strdupcat(dir, "/../clanginclude", "");
+    p = strdupcat(dir, "/../clanginclude", "");
+    if (0 != stat(p, &st) || !S_ISDIR(st.st_mode)) {
+     dir_missing:
+      fdprint(2, strdupcat(
+          "error: directory missing for -xstatic, please install: ", p, "\n"));
+      return 123;
+    }
+    *argp++ = p;
     /* TODO(pts): Move C++ includes before C includes (-cxx-isystem doesn't
      * matter, it will be added after -isystem) just like in regular clang.
      */
     *argp++ = "-cxx-isystem";
     *argp++ = strdupcat(dir, "/../usr/c++include", "");
     *argp++ = "-isystem";
-    *argp++ = strdupcat(dir, "/../usr/include", "");
-    /* The linker would be ../gccld/ld, which is also a trampoline binary of
+    p = strdupcat(dir, "/../usr/include", "");
+    if (0 != stat(p, &st) || !S_ISDIR(st.st_mode)) goto dir_missing;
+    *argp++ = p;
+    p = strdupcat(dir, "/../xstaticld/ld.bin", "");
+    if (0 != stat(p, &st) || !S_ISREG(st.st_mode)) {
+     file_missing:
+      fdprint(2, strdupcat(
+          "error: file missing for -xstatic, please install: ", p, "\n"));
+      return 123;
+    }
+    p = strdupcat(dir, "/../usr/lib/libc.a", "");
+    if (0 != stat(p, &st) || !S_ISREG(st.st_mode)) goto file_missing;
+    p = strdupcat(dir, "/../usr/lib/crt1.o", "");
+    if (0 != stat(p, &st) || !S_ISREG(st.st_mode)) goto file_missing;
+    p = strdupcat(dir, "/../xstaticld/crtbeginT.o", "");
+    if (0 != stat(p, &st) || !S_ISREG(st.st_mode)) goto file_missing;
+    /* The linker would be ../xstaticld/ld, which is also a trampoline binary of
      * ours.
      */
-    *argp++ = strdupcat("-B", dir, "/../gccld");
+    *argp++ = strdupcat("-B", dir, "/../xstaticld");
     /* Run `clang -print-search-dirs' to confirm that it was properly
      * detected.
      */
