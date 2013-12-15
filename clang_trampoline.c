@@ -297,12 +297,12 @@ int main(int argc, char **argv) {
       }
     } else {  /* ldmode == LM_XSTATIC. */
       *argp++ = "-nostdlib";  /* No system directories to find .a files. */
-      /* We put xstaticld with
+      /* We put xstaticfld with
        libgcc.a first, because clang puts
        * /usr/lib/gcc/i486-linux-gnu/4.4 with libgcc.a before /usr/lib with
        * libc.a .
        */
-      *argp++ = strdupcat("-L", dir, "/../xstaticld");
+      *argp++ = strdupcat("-L", dir, "/../xstaticfld");
       *argp++ = strdupcat("-L", dir, "/../usr/lib");
       for (argi = argv + 1; (arg = *argi); ++argi) {
         if (0 == strcmp(arg, "-z") &&
@@ -438,7 +438,7 @@ int main(int argc, char **argv) {
     p = strdupcat(dir, "/../usr/include", "");
     if (0 != stat(p, &st) || !S_ISDIR(st.st_mode)) goto dir_missing;
     *argp++ = p;
-    p = strdupcat(dir, "/../xstaticld/ld.bin", "");
+    p = strdupcat(dir, "/../xstaticfld/ld.bin", "");
     if (0 != stat(p, &st) || !S_ISREG(st.st_mode)) {
      file_missing:
       fdprint(2, strdupcat(
@@ -449,12 +449,12 @@ int main(int argc, char **argv) {
     if (0 != stat(p, &st) || !S_ISREG(st.st_mode)) goto file_missing;
     p = strdupcat(dir, "/../usr/lib/crt1.o", "");
     if (0 != stat(p, &st) || !S_ISREG(st.st_mode)) goto file_missing;
-    p = strdupcat(dir, "/../xstaticld/crtbeginT.o", "");
+    p = strdupcat(dir, "/../xstaticfld/crtbeginT.o", "");
     if (0 != stat(p, &st) || !S_ISREG(st.st_mode)) goto file_missing;
-    /* The linker would be ../xstaticld/ld, which is also a trampoline binary of
-     * ours.
+    /* The linker would be ../xstaticfld/ld, which is also a trampoline binary
+     * of ours.
      */
-    *argp++ = strdupcat("-B", dir, "/../xstaticld");
+    *argp++ = strdupcat("-B", dir, "/../xstaticfld");
     /* Run `clang -print-search-dirs' to confirm that it was properly
      * detected.
      */
