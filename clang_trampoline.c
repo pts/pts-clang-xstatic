@@ -216,7 +216,11 @@ int main(int argc, char **argv) {
   } else {
     p[-1] = '\0';
   }
-  if (detect_linker(argv)) {  /* clang runs as as ld. */
+  if (detect_linker(argv)) {  /* clang trampoline runs as as ld. */
+    /* Please note that we are only invoked for `clang -xstatic', because
+     * without -xstatic, the ld symlink is outside of the clang program search
+     * path, because -gcc-toolchain was not specified.
+     */ 
     /* All we do is exec()ing ld.bin with the following dropped from argv:
      *
      * -L/usr/lib...
