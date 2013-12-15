@@ -338,13 +338,13 @@ static void detect_lang(char **argv, lang_t *lang) {
   for (basename = arg + strlen(arg); basename != arg && basename[-1] != '/';
        --basename) {}
   lang->is_cxx = strstr(basename, "++") != NULL;
-  lang->is_clang = strstr(basename, "clang") != NULL;  
+  lang->is_clang = strstr(basename, "clang") != NULL;
   for (argi = argv + 1; (arg = *argi); ++argi) {
     if (0 == strcmp(arg, "-xc++")) {
       lang->is_cxx = 1;
     } else if (0 == strcmp(arg, "-ccc-cxx")) {  /* Enable C++ for Clang. */
       lang->is_cxx = 1;
-      /* -ccc-cxx is a Clang-specific flag, gcc doesn't have it.*/ 
+      /* -ccc-cxx is a Clang-specific flag, gcc doesn't have it.*/
       lang->is_clang = 1;
     } else if (0 == strcmp(arg, "-x") && argi[1]) {
       lang->is_cxx = 0 == strcmp(*++argi, "c++");
@@ -533,7 +533,6 @@ int main(int argc, char **argv) {
   argv[1] = argv[0];
   ++argv;
   --argc;
-  /* !! are we able to use the clang trampoline */
   argp = args = malloc(sizeof(*args) * (argc + 17));
   *argp++ = prog;  /* Set destination argv[0]. */
   if (!argv[1] || (!argv[2] && 0 == strcmp(argv[1], "-v"))) {
@@ -553,24 +552,18 @@ int main(int argc, char **argv) {
     /* We don't need get_autodetect_archflag(argv), we always send "-m32". */
     *argp++ = "-m32";
     *argp++ = "-static";
-    /* !! TODO(pts): Get rid of this warning if compiling only .o files:
-     * clang.bin: warning: argument unused during compilation: '-nostdinc'
-     * -Qunused-arguments, but only for this flag.
+    /* The linker would be ../xstaticcld/ld, which is also a trampoline binary
+     * of ours.
      */
+    *argp++ = strdupcat("-B", dirup, "/xstaticcld");
     /*
      * Without this we get the following error compiling binutils 2.20.1:
      * chew.c:(.text+0x233f): undefined reference to `__stack_chk_fail'
      * We can't implement this in a compatible way, glibc gcc generates %gs:20,
      * uClibc-0.9.33 has symbol __stack_chk_guard.
      */
-    if (lang.is_compiling) {  /* !! */
-      *argp++ = "-fno-stack-protector";
-    }
-    /* The linker would be ../xstaticcld/ld, which is also a trampoline binary
-     * of ours.
-     */
-    *argp++ = strdupcat("-B", dirup, "/xstaticcld");
     if (lang.is_compiling) {
+      *argp++ = "-fno-stack-protector";
       *argp++ = "-nostdinc";
       if (lang.is_cxx) {
         *argp++ = "-nostdinc++";

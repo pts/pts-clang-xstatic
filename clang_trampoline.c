@@ -310,6 +310,71 @@ static char *find_on_path(const char *cmd) {
   return NULL;
 }
 
+typedef struct lang_t {
+  char is_cxx;
+  char is_clang;
+  char is_compiling;
+} lang_t;
+
+static void detect_lang(char **argv, lang_t *lang) {
+  char **argi, *arg, *basename, *ext;
+  lang->is_compiling = 0;
+  arg = argv[0];
+  for (basename = arg + strlen(arg); basename != arg && basename[-1] != '/';
+       --basename) {}
+  lang->is_cxx = strstr(basename, "++") != NULL;
+  lang->is_clang = strstr(basename, "clang") != NULL;
+  for (argi = argv + 1; (arg = *argi); ++argi) {
+    if (0 == strcmp(arg, "-xc++")) {
+      lang->is_cxx = 1;
+    } else if (0 == strcmp(arg, "-ccc-cxx")) {  /* Enable C++ for Clang. */
+      lang->is_cxx = 1;
+      /* -ccc-cxx is a Clang-specific flag, gcc doesn't have it.*/
+      lang->is_clang = 1;
+    } else if (0 == strcmp(arg, "-x") && argi[1]) {
+      lang->is_cxx = 0 == strcmp(*++argi, "c++");
+    } else if (arg[0] != '-') {
+      for (ext = arg + strlen(arg);
+           ext != arg && ext[-1] != '.' && ext[-1] != '/';
+           --ext) {}
+      if (ext == basename) ext = "";
+      if (0 == strcmp(ext, "cc") ||
+          0 == strcmp(ext, "cp") ||
+          0 == strcmp(ext, "cxx") ||
+          0 == strcmp(ext, "cpp") ||
+          0 == strcmp(ext, "CPP") ||
+          0 == strcmp(ext, "c++") ||
+          0 == strcmp(ext, "C")) {
+        lang->is_cxx = 1;
+        lang->is_compiling = 1;
+      } else if (0 == strcmp(ext, "c") ||
+                 0 == strcmp(ext, "i") ||
+                 0 == strcmp(ext, "ii") ||
+                 0 == strcmp(ext, "m") ||
+                 0 == strcmp(ext, "mi") ||
+                 0 == strcmp(ext, "mm") ||
+                 0 == strcmp(ext, "M") ||
+                 0 == strcmp(ext, "mii") ||
+                 0 == strcmp(ext, "h") ||
+                 0 == strcmp(ext, "H") ||
+                 0 == strcmp(ext, "hp") ||
+                 0 == strcmp(ext, "hxx") ||
+                 0 == strcmp(ext, "hpp") ||
+                 0 == strcmp(ext, "HPP") ||
+                 0 == strcmp(ext, "h++") ||
+                 0 == strcmp(ext, "tcc") ||
+                 0 == strcmp(ext, "s") ||
+                 0 == strcmp(ext, "S") ||
+                 0 == strcmp(ext, "sx")) {
+        /* Extensions taken from `man gcc', Clang supports only a subset:
+         * C, C++, Objective C and Objective C++. Fortran, ADA, Go, Java etc.
+         * skipped.
+         */
+        lang->is_compiling = 1;
+      }
+    }
+  }
+}
 
 typedef enum ldmode_t {
   LM_XCLANGLD = 0,  /* Use the ld and -lgcc shipped with clang. */
@@ -493,51 +558,50 @@ int main(int argc, char **argv) {
   } else if (ldmode == LM_XSTATIC) {
     struct stat st;
     char need_linker;
-
+    lang_t lang;
     check_bflags(argv, 0);
     need_linker = detect_need_linker(argv);
     detect_nostdinc(argv, &has_nostdinc, &has_nostdincxx);
+    detect_lang(argv, &lang);
+
     /* When adding more arguments here, increase the args malloc count. */
     /* We don't need get_autodetect_archflag(argv), we always send "-m32". */
     *argp++ = "-m32";
     *argp++ = "-static";
-    /* !! TODO(pts): Get rid of this warning if compiling only .o files:
-     * clang.bin: warning: argument unused during compilation: '-nostdinc'
-     * -Qunused-arguments, but only for this flag.
-     */
-    *argp++ = "-Qunused-arguments";
-    /*
-     * Without this we get the following error compiling binutils 2.20.1:
-     * chew.c:(.text+0x233f): undefined reference to `__stack_chk_fail'
-     * We can't implement this in a compatible way, glibc gcc generates %gs:20,
-     * uClibc-0.9.33 has symbol __stack_chk_guard.
-     */
-    *argp++ = "-fno-stack-protector";
-    *argp++ = "-nostdinc";
-    *argp++ = "-nostdinc++";
-    if (!has_nostdinc) {
-      *argp++ = "-isystem";
-      p = strdupcat(dirup, "/clanginclude", "");
-      if (0 != stat(p, &st) || !S_ISDIR(st.st_mode)) {
-       dir_missing:
-        fdprint(2, strdupcat(
-            "error: directory missing for -xstatic, please install: ", p, "\n"));
-        return 123;
-      }
-      *argp++ = p;
-    }
-    if (!has_nostdincxx) {
-      /* TODO(pts): Move C++ includes before C includes (-cxx-isystem doesn't
-       * matter, it will be added after -isystem) just like in regular clang.
+    if (lang.is_compiling) {
+      /*
+       * Without this we get the following error compiling binutils 2.20.1:
+       * chew.c:(.text+0x233f): undefined reference to `__stack_chk_fail'
+       * We can't implement this in a compatible way, glibc gcc generates %gs:20,
+       * uClibc-0.9.33 has symbol __stack_chk_guard.
        */
-      *argp++ = "-cxx-isystem";
-      *argp++ = strdupcat(dirup, "/uclibcusr/c++include", "");
-    }
-    if (!has_nostdinc) {
-      *argp++ = "-isystem";
-      p = strdupcat(dirup, "/uclibcusr/include", "");
-      if (0 != stat(p, &st) || !S_ISDIR(st.st_mode)) goto dir_missing;
-      *argp++ = p;
+      *argp++ = "-fno-stack-protector";
+      *argp++ = "-nostdinc";
+      *argp++ = "-nostdinc++";
+      if (!has_nostdinc) {
+        *argp++ = "-isystem";
+        p = strdupcat(dirup, "/clanginclude", "");
+        if (0 != stat(p, &st) || !S_ISDIR(st.st_mode)) {
+         dir_missing:
+          fdprint(2, strdupcat(
+              "error: directory missing for -xstatic, please install: ", p, "\n"));
+          return 123;
+        }
+        *argp++ = p;
+      }
+      if (!has_nostdincxx) {
+        /* TODO(pts): Move C++ includes before C includes (-cxx-isystem doesn't
+         * matter, it will be added after -isystem) just like in regular clang.
+         */
+        *argp++ = "-cxx-isystem";
+        *argp++ = strdupcat(dirup, "/uclibcusr/c++include", "");
+      }
+      if (!has_nostdinc) {
+        *argp++ = "-isystem";
+        p = strdupcat(dirup, "/uclibcusr/include", "");
+        if (0 != stat(p, &st) || !S_ISDIR(st.st_mode)) goto dir_missing;
+        *argp++ = p;
+      }
     }
     p = strdupcat(dirup, "/xstaticfld/ld.bin", "");
     if (0 != stat(p, &st) || !S_ISREG(st.st_mode)) {
@@ -576,9 +640,10 @@ int main(int argc, char **argv) {
   } else {
     char need_linker;
     archbit_t archbit, archbit_override;
-
+    lang_t lang;
     if (check_bflags(argv, ldmode == LM_XCLANGLD)) ldmode = LM_XSYSLD;
     need_linker = detect_need_linker(argv);
+    detect_lang(argv, &lang);
     detect_nostdinc(argv, &has_nostdinc, &has_nostdincxx);
     archbit = get_archbit_detected(argv);
     archbit_override = get_archbit_override(archbit);
@@ -615,16 +680,18 @@ int main(int argc, char **argv) {
         *argp++ = "-Wl,-nostdlib";  /* -L/usr and equivalents added by clang. */
       }
     }
-    if (!has_nostdinc) {
-      *argp++ = "-isystem";
-      *argp++ = strdupcat(dirup, "/clanginclude", "");
-    }
-    if (archbit == ARCHBIT_64 && !has_nostdinc) {
-      /* Let the compiler find our replacement for gnu/stubs-64.h on 32-bit
-       * systems which don't provide it.
-       */
-      *argp++ = "-idirafter";  /* Add with low priority. */
-      *argp++ = strdupcat(dirup, "/clanginc64low", "");
+    if (lang.is_compiling) {
+      if (!has_nostdinc) {
+        *argp++ = "-isystem";
+        *argp++ = strdupcat(dirup, "/clanginclude", "");
+      }
+      if (archbit == ARCHBIT_64 && !has_nostdinc) {
+        /* Let the compiler find our replacement for gnu/stubs-64.h on 32-bit
+         * systems which don't provide it.
+         */
+        *argp++ = "-idirafter";  /* Add with low priority. */
+        *argp++ = strdupcat(dirup, "/clanginc64low", "");
+      }
     }
   }
   memcpy(argp, argv + 1, argc * sizeof(*argp));
