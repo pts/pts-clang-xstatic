@@ -274,7 +274,7 @@ int main(int argc, char **argv) {
    * ... and believed it's ld-linux.so.2. I edited the binary to /proc/self/exE
    * to fix it.
    */
-  argp = args = malloc(sizeof(*args) * (argc + 13));
+  argp = args = malloc(sizeof(*args) * (argc + 16));
   *argp++ = argv0 = argv[0];  /* No effect, will be ignored. */
   /* TODO(pts): Make clang.bin configurable. */
   *argp++ = prog = strdupcat(dir, "/clang.bin", "");
@@ -322,9 +322,15 @@ int main(int argc, char **argv) {
     *argp++ = "-Qunused-arguments";
     *argp++ = "-nostdinc";
     *argp++ = "-nostdinc++";
-    *argp++ = strdupcat("-isystem", dir, "/../lib/clang/cur/include");
-    *argp++ = strdupcat("-isystem", dir, "/../usr/include");
-    *argp++ = strdupcat("-cxx-isystem", dir, "/../usr/c++include");
+    *argp++ = "-isystem";
+    *argp++ = strdupcat(dir, "/../clanginclude", "");
+    /* TODO(pts): Move C++ includes before C includes (-cxx-isystem doesn't
+     * matter, it will be added after -isystem) just like in regular clang.
+     */
+    *argp++ = "-cxx-isystem";
+    *argp++ = strdupcat(dir, "/../usr/c++include", "");
+    *argp++ = "-isystem";
+    *argp++ = strdupcat(dir, "/../usr/include", "");
     /* The linker would be ../xstatic/i486-linux-gnu/bin/ld, which is also
      * a trampoline binary of ours.
      */
@@ -347,6 +353,8 @@ int main(int argc, char **argv) {
         need_linker = 0;
       }
     }
+    *argp++ = "-isystem";
+    *argp++ = strdupcat(dir, "/../clanginclude", "");
     /* If !need_linker, avoid clang warning about unused linker input. */
     if (need_linker) {
       *argp++ = "-Wl,-nostdlib";  /* -L/usr and equivalents added by clang. */
