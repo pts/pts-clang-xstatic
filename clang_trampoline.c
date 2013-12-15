@@ -228,6 +228,20 @@ static void check_bflags(char **argv) {
   }
 }
 
+static char detect_need_linker(char **argv) {
+  char **argi, *arg, c;
+  for (argi = argv + 1; (arg = *argi); ++argi) {
+    if (arg[0] != '-') continue;
+    c = arg[1];
+    /* E.g. with "-E" the linker won't be invoked. */
+    if ((c == 'M' && arg[2] == 'M' && arg[3] == '\0') ||
+        ((c == 'E' || c == 'S' || c == 'c' || c == 'M') && arg[2] == '\0')) {
+      return 0;
+    }
+  }
+  return 1;
+}
+
 typedef enum ldmode_t {
   LM_XCLANGLD = 0,  /* Use the ld and -lgcc shipped with clang. */
   LM_XSYSLD = 1,
@@ -270,11 +284,14 @@ int main(int argc, char **argv) {
     for (argi = argv + 1; (arg = *argi); ++argi) {
       if (0 == strcmp(arg, "--do-xclangld")) {
         ldmode = LM_XCLANGLD;
+      } else if (0 == strcmp(arg, "--do-clangldv")) {
+        is_verbose = 1;
       }
     }
     if (ldmode == LM_XCLANGLD) {
       for (argi = argv + 1; (arg = *argi); ++argi) {
-        if (0 != strcmp(arg, "--do-xclangld")) {
+        if (0 != strcmp(arg, "--do-xclangld") &&
+            0 != strcmp(arg, "--do-clangldv")) {
           *argp++ = *argi;
         }
       }
@@ -291,6 +308,7 @@ int main(int argc, char **argv) {
         if (0 == strcmp(arg, "-z") &&
             argi[1] && 0 == strcmp(argi[1], "relro")) {
           ++argi;  /* Skip and drop both arguments: -z relro */
+        } else if (0 == strcmp(arg, "--do-clangldv")) {
         } else if (0 != strcmp(arg, "--hash-style=both") &&
             0 != strcmp(arg, "--build-id") &&
             /* -L/usr/local/lib is not emitted by clang 3.3; we play safe. */
@@ -304,9 +322,9 @@ int main(int argc, char **argv) {
     *argp = NULL;
     prog = strdupcat(argv0, ".bin", "");  /* "ld.bin". */
     args[0] = prog;
-#if 0  /* Can't detect if `clang -v' was specified, so don't pollute. */
-    fdprint(2, escape_argv("info: running ld:\n", args, "\n"));
-#endif
+    if (is_verbose) {
+      fdprint(2, escape_argv("info: running ld:\n", args, "\n"));
+    }
     execv(prog, args);
     fdprint(2, strdupcat("error: clang-ld: exec failed: ", prog, "\n"));
     return 120;
@@ -387,7 +405,10 @@ int main(int argc, char **argv) {
 #if USE_XSTATIC
   } else if (ldmode == LM_XSTATIC) {
     struct stat st;
+    char need_linker;
+
     check_bflags(argv);
+    need_linker = detect_need_linker(argv);
     /* When adding more arguments here, increase the args malloc count. */
     /* We don't need get_autodetect_archflag(argv), we always send "-m32". */
     *argp++ = "-m32";
@@ -437,23 +458,18 @@ int main(int argc, char **argv) {
     /* Run `clang -print-search-dirs' to confirm that it was properly
      * detected.
      */
+    if (need_linker && is_verbose) {
+      *argp++ = "-Wl,--do-clangldv";
+    }
 #endif
   } else if (argv[1] && 0 == strcmp(argv[1], "-cc1")) {
     febemsg = "backend";
   } else {
-    char need_linker = 1, c;
+    char need_linker;
     archbit_t archbit, archbit_override;
 
     check_bflags(argv);
-    for (argi = argv + 1; (arg = *argi); ++argi) {
-      if (arg[0] != '-') continue;
-      c = arg[1];
-      /* E.g. with "-E" the linker won't be invoked. */
-      if ((c == 'M' && arg[2] == 'M' && arg[3] == '\0') ||
-          ((c == 'E' || c == 'S' || c == 'c' || c == 'M') && arg[2] == '\0')) {
-        need_linker = 0;
-      }
-    }
+    need_linker = detect_need_linker(argv);
     archbit = get_archbit_detected(argv);
     archbit_override = get_archbit_override(archbit);
     if (archbit_override == ARCHBIT_32) {
@@ -481,8 +497,9 @@ int main(int argc, char **argv) {
       if (need_linker) {
         *argp++ = "-static-libgcc";
         *argp++ = "-Wl,--do-xclangld";
+        if (is_verbose) *argp++ = "-Wl,--do-clangldv";
       }
-    } else {
+    } else {  /* ldmode == LM_XSYSLD. */
       /* If !need_linker, avoid clang warning about unused linker input. */
       if (need_linker) {
         *argp++ = "-Wl,-nostdlib";  /* -L/usr and equivalents added by clang. */
