@@ -203,8 +203,9 @@ static void fdprint(int fd, const char *msg) {
 }
 
 static char is_dirprefix(const char *s, const char *prefix) {
-  const char const *p = prefix + strlen(prefix);
-  return 0 == strncmp(s, prefix, p - prefix) && (*p == '\0' || *p == '/');
+  const size_t sprefix = strlen(prefix);
+  return 0 == strncmp(s, prefix, sprefix) && (
+      s[sprefix] == '\0' || s[sprefix] == '/');
 }
 
 typedef enum ldmode_t {
