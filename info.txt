@@ -36,11 +36,27 @@ Developer info:
   symlink, but it can't start with `../' . The 4.1 pathname component cannot
   be omitted. Not even gcc can be a symlink to ... .
 * clang would find clanginclude as lib/clang/3.3/include automatically.
+* `xstatic ~/d/clang/bin/clang -print-search-dirs' doesn't print
+  `/home/pts/bin.local/../prg/xstatic/gccld', but
+  `xstatic ~/d/clang/bin/clang -print-prog-name=ld' prints
+  `/home/pts/bin.local/../prg/xstatic/gccld/ld'.
+* `ld -nostdlib' is different from `gcc -nostdlib', the latter also prevents
+  -lc.
 
 TODOs:
 
+* TODO(pts): Too many ../ components in the generated ld command-line,
+             collapse them (also allow symbolic links).
+* TODO(pts): Get rid of redundancy between xstatic.c and clang_trampoline.c.
 * TODO(pts): Autodetect 3.3 in the clang cur symlink.
 * TODO(pts): Recompile or relink Clang 3.3 statically.
-# TODO(pts): Make clang not open /etc/lsb-release (DetectDistro, impossible).
+* TODO(pts): Make clang not open /etc/lsb-release (DetectDistro, impossible).
 * TODO(pts): Does LM_CLANGLD need -lgcc? Which symbols?
 * TODO(pts): Why is include_many.cc 160 bytes larger without -xsysld?
+* TODO(pts): Write README.txt for all 3 projects.
+* TODO(pts): Upgrade the pts-clang-xstatic linker? It seems to work fine.
+* TODO(pts): Document new conditions in usr/include/bits/cpp_type_traits.h
+*            and usr/include/limits and other libstdc++ changes.
+* TODO(pts): Rewrite xstatic in C once we have Clang support.
+* TODO(pts): Test non-xstatic exception handling in many g++ and Clang versions.
+* TODO(pts): Detect wrong crt1.o (in /usr/lib/i386-linux-gnu etc.).

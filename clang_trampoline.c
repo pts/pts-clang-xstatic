@@ -9,6 +9,20 @@
  * or "ld.bin".
  *
  * Since our process is short-lived, we don't bother free()ing memory.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 #define _GNU_SOURCE 1  /* Needed for get_current_dir_name() */
@@ -187,6 +201,7 @@ static char detect_linker(char **argv) {
        0 != strcmp(arg, "--eh-frame-hdr") &&  /* By clang. */
        0 != strcmp(arg, "--build-id") &&  /* By clang and gcc. */
        0 != strncmp(arg, "--hash-style=", 13) &&
+       /* It's important that we don't match --do-xstaticcld here. */
        0 != strcmp(arg, "--do-xclangld") &&
        0 != strcmp(arg, "-dynamic-linker") &&  /* By clang. */
        0 != strcmp(arg, "--start-group") &&  /* By gcc/clang -static. */
@@ -220,7 +235,7 @@ static void check_bflags(char **argv) {
         is_argprefix(arg, "--gcc-toolchain")) {
       fdprint(2, strdupcat(
           "error: flag not supported in this ldmode: ", arg, "\n"));
-      exit(123);
+      exit(122);
     }
   }
 }
@@ -239,6 +254,20 @@ static char detect_need_linker(char **argv) {
   return 1;
 }
 
+static void detect_nostdinc(char **argv,
+                            /* Output bool arguments. */
+                            char *has_nostdinc, char *has_nostdincxx) {
+  char **argi, *arg;
+  *has_nostdinc = *has_nostdincxx = 0;
+  for (argi = argv + 1; (arg = *argi); ++argi) {
+    if (0 == strcmp(arg, "-nostdinc")) {
+      *has_nostdinc = 1;
+    } else if (0 == strcmp(arg, "-nostdinc++")) {
+      *has_nostdincxx = 1;
+    }
+  }
+}
+
 typedef enum ldmode_t {
   LM_XCLANGLD = 0,  /* Use the ld and -lgcc shipped with clang. */
   LM_XSYSLD = 1,
@@ -255,6 +284,7 @@ int main(int argc, char **argv) {
   char is_verbose = 0;
   ldmode_t ldmode;
   char **argi, *arg;
+  char has_nostdinc, has_nostdincxx;
 
   for (p = dir + strlen(dir); p != dir && p[-1] != '/'; --p) {}
   if (p == dir) {
@@ -275,7 +305,7 @@ int main(int argc, char **argv) {
      * --build-id (because not supported by old ld)
      * -z relro (because it increases the binary size and it's useless for static)
      */
-    argp = args = malloc(sizeof(*args) * (argc + 4));
+    argp = args = malloc(sizeof(*args) * (argc + 5));
     *argp++ = argv0 = *argv;
     ldmode = LM_XSTATIC;
     for (argi = argv + 1; (arg = *argi); ++argi) {
@@ -304,14 +334,26 @@ int main(int argc, char **argv) {
       for (argi = argv + 1; (arg = *argi); ++argi) {
         if (0 == strcmp(arg, "-z") &&
             argi[1] && 0 == strcmp(argi[1], "relro")) {
+          /* Would increase size. */
           ++argi;  /* Skip and drop both arguments: -z relro */
-        } else if (0 == strcmp(arg, "--do-clangldv")) {
-        } else if (0 != strcmp(arg, "--hash-style=both") &&
-            0 != strcmp(arg, "--build-id") &&
+        } else if (
+            0 == strcmp(arg, "-nostdlib") ||
+            0 == strcmp(arg, "--do-clangcld") ||
+            0 == strcmp(arg, "--do-clangldv") ||
+            0 == strncmp(arg, "--hash-style=", 13) ||  /* Would increase size.*/
+            0 == strcmp(arg, "--build-id") ||
             /* -L/usr/local/lib is not emitted by clang 3.3; we play safe. */
-            !is_dirprefix(arg, "-L/usr/local/lib") &&
-            !is_dirprefix(arg, "-L/usr/lib") &&
-            !is_dirprefix(arg, "-L/lib")) {
+            is_dirprefix(arg, "-L/usr/local/lib") ||
+            is_dirprefix(arg, "-L/usr/lib") ||
+            is_dirprefix(arg, "-L/lib")) {
+          /* Omit this argument. */
+        } else if (0 == strcmp(arg, "-lstdc++")) {
+          /* Fixup for linker errors: undefined reference to
+           *`_Unwind_SjLj_Unregister'.
+           */
+          *argp++ = arg;
+          *argp++ = "-lstdc++usjlj";  /* The order is important. */
+        } else {
           *argp++ = *argi;
         }
       }
@@ -340,7 +382,7 @@ int main(int argc, char **argv) {
    * ... and believed it's ld-linux.so.2. I edited the binary to /proc/self/exE
    * to fix it.
    */
-  argp = args = malloc(sizeof(*args) * (argc + 16));
+  argp = args = malloc(sizeof(*args) * (argc + 17));
   *argp++ = argv0 = argv[0];  /* No effect, will be ignored. */
   /* TODO(pts): Make clang.bin configurable. */
   *argp++ = prog = strdupcat(dir, "/clang.bin", "");
@@ -398,35 +440,49 @@ int main(int argc, char **argv) {
 
     check_bflags(argv);
     need_linker = detect_need_linker(argv);
+    detect_nostdinc(argv, &has_nostdinc, &has_nostdincxx);
     /* When adding more arguments here, increase the args malloc count. */
     /* We don't need get_autodetect_archflag(argv), we always send "-m32". */
     *argp++ = "-m32";
     *argp++ = "-static";
-    /* TODO(pts): Get rid of this warning if compiling only .o files:
+    /* !! TODO(pts): Get rid of this warning if compiling only .o files:
      * clang.bin: warning: argument unused during compilation: '-nostdinc'
      * -Qunused-arguments, but only for this flag.
      */
     *argp++ = "-Qunused-arguments";
+    /*
+     * Without this we get the following error compiling binutils 2.20.1:
+     * chew.c:(.text+0x233f): undefined reference to `__stack_chk_fail'
+     * We can't implement this in a compatible way, glibc gcc generates %gs:20,
+     * uClibc-0.9.33 has symbol __stack_chk_guard.
+     */
+    *argp++ = "-fno-stack-protector";
     *argp++ = "-nostdinc";
     *argp++ = "-nostdinc++";
-    *argp++ = "-isystem";
-    p = strdupcat(dir, "/../clanginclude", "");
-    if (0 != stat(p, &st) || !S_ISDIR(st.st_mode)) {
-     dir_missing:
-      fdprint(2, strdupcat(
-          "error: directory missing for -xstatic, please install: ", p, "\n"));
-      return 123;
+    if (!has_nostdinc) {
+      *argp++ = "-isystem";
+      p = strdupcat(dir, "/../clanginclude", "");
+      if (0 != stat(p, &st) || !S_ISDIR(st.st_mode)) {
+       dir_missing:
+        fdprint(2, strdupcat(
+            "error: directory missing for -xstatic, please install: ", p, "\n"));
+        return 123;
+      }
+      *argp++ = p;
     }
-    *argp++ = p;
-    /* TODO(pts): Move C++ includes before C includes (-cxx-isystem doesn't
-     * matter, it will be added after -isystem) just like in regular clang.
-     */
-    *argp++ = "-cxx-isystem";
-    *argp++ = strdupcat(dir, "/../uclibcusr/c++include", "");
-    *argp++ = "-isystem";
-    p = strdupcat(dir, "/../uclibcusr/include", "");
-    if (0 != stat(p, &st) || !S_ISDIR(st.st_mode)) goto dir_missing;
-    *argp++ = p;
+    if (!has_nostdincxx) {
+      /* TODO(pts): Move C++ includes before C includes (-cxx-isystem doesn't
+       * matter, it will be added after -isystem) just like in regular clang.
+       */
+      *argp++ = "-cxx-isystem";
+      *argp++ = strdupcat(dir, "/../uclibcusr/c++include", "");
+    }
+    if (!has_nostdinc) {
+      *argp++ = "-isystem";
+      p = strdupcat(dir, "/../uclibcusr/include", "");
+      if (0 != stat(p, &st) || !S_ISDIR(st.st_mode)) goto dir_missing;
+      *argp++ = p;
+    }
     p = strdupcat(dir, "/../xstaticfld/ld.bin", "");
     if (0 != stat(p, &st) || !S_ISREG(st.st_mode)) {
      file_missing:
@@ -450,6 +506,15 @@ int main(int argc, char **argv) {
     if (need_linker && is_verbose) {
       *argp++ = "-Wl,--do-clangldv";
     }
+    for (++argv; (arg = *argv); ++argv) {
+      if (0 == strcmp(arg, "-nostdinc") ||
+          0 == strcmp(arg, "-nostdinc++")) {
+      } else {
+        *argp++ = arg;
+      }
+    }
+    *argp++ = NULL;
+    argc = 0;
   } else if (argv[1] && 0 == strcmp(argv[1], "-cc1")) {
     febemsg = "backend";
   } else {
@@ -458,6 +523,7 @@ int main(int argc, char **argv) {
 
     check_bflags(argv);
     need_linker = detect_need_linker(argv);
+    detect_nostdinc(argv, &has_nostdinc, &has_nostdincxx);
     archbit = get_archbit_detected(argv);
     archbit_override = get_archbit_override(archbit);
     if (archbit_override == ARCHBIT_32) {
@@ -493,9 +559,11 @@ int main(int argc, char **argv) {
         *argp++ = "-Wl,-nostdlib";  /* -L/usr and equivalents added by clang. */
       }
     }
-    *argp++ = "-isystem";
-    *argp++ = strdupcat(dir, "/../clanginclude", "");
-    if (archbit == ARCHBIT_64) {
+    if (!has_nostdinc) {
+      *argp++ = "-isystem";
+      *argp++ = strdupcat(dir, "/../clanginclude", "");
+    }
+    if (archbit == ARCHBIT_64 && !has_nostdinc) {
       /* Let the compiler find our replacement for gnu/stubs-64.h on 32-bit
        * systems which don't provide it.
        */
