@@ -23,6 +23,7 @@ Developer info:
   return sbrk((size + 15) & ~15); }'. Maybe uClibc uses malloc internally.
 * http://llvm.org/releases/3.3/clang+llvm-3.3-i386-debian6.tar.bz2 doesn't
   contain crtbegin.o etc, we've fetched it from uClibc.
+* `ld --eh-frame-hdr' is used by g++
 
 TODOs:
 
