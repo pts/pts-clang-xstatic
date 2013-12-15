@@ -22,6 +22,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/utsname.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 static char *strdupcat(const char *a, const char *b, const char *c) {
@@ -367,8 +368,19 @@ int main(int argc, char **argv) {
      */
     is_verbose = 0;
     if (argv[1]) {
-      /* TODO(pts): Move this to the end of the output, after exec. */
-      fdprint(1, "Additinal flags supported: -xstatic -xsysld\n");
+      pid_t pid = fork();
+      if (pid < 0) exit(124);
+      if (pid != 0) {  /* Parent. */
+        int status;
+        pid_t pid2 = waitpid(pid, &status, 0);
+        if (pid != pid2) exit(124);
+        if (status != 0) {
+          exit(WIFEXITED(status) ? WEXITSTATUS(status) : 124);
+        }
+        /* Print at the end of the output, after exec. */
+        fdprint(1, "Additinal flags supported: -xstatic -xsysld\n");
+        exit(0);
+      }
     }
   } else if (argv[1] && 0 == strcmp(argv[1], "--help")) {
     fdprint(1, "Additinal flags supported: -xstatic -xsysld\n");
