@@ -127,13 +127,71 @@ static archbit_t get_archbit_override(archbit_t archbit_detected) {
   return ARCHBIT_32;
 }
 
+/** Return a newly malloc()ed string containing prefix + escaped(argv) +
+ * suffix, the caller takes ownership.
+ */
+static char *escape_argv(const char *prefix, char **argv, char *suffix) {
+  size_t sprefix = strlen(prefix);
+  /* An upper limit of the output size. */
+  size_t size = sprefix + strlen(suffix);
+  char **argi, *arg;
+  char *out, *p, c;
+  for (argi = argv; (arg = *argi); ++argi) {
+    size += 3 + strlen(arg);  /* Space (or '\0') plus the single quotes. */
+    for (; *arg; ++arg) {
+      if (*arg == '\'') size += 3;
+    }
+  }
+  p = out = malloc(size);
+  memcpy(p, prefix, sprefix);
+  p += sprefix;
+  for (argi = argv; (arg = *argi); ++argi) {
+    char is_simple = (*arg != '=') && (*arg != '\0');
+    if (is_simple) {
+      for (; (c = *arg) != '\0' || (c == '+' || c == '-' || c == '_' ||
+             c == '=' || c == '.' || c == '/' ||
+             ((c | 32) - 'a' + 0U) <= 'z' - 'a' + 0U ||
+             (c - '0' + 0U) <= 9U); ++arg) {}
+      is_simple = (*arg == '\0');
+      arg = *argi;
+    }
+    if (is_simple) {  /* Append unescaped. */
+      sprefix = strlen(arg);
+      memcpy(p, arg, sprefix);
+      p += sprefix;
+    } else {  /* Escape with single quotes. */
+      *p++ = '\'';
+      for (; (c = *arg); ++arg) {
+        if (c == '\'') {
+          *p++ = '\'';
+          *p++ = '\\';
+          *p++ = '\'';
+        }
+        *p++ = c;
+      }
+      *p++ = '\'';
+    }
+    *p++ = ' ';
+  }
+  strcpy(--p, suffix);  /* `--' to replace the space. */
+  return out;
+}
+
+static void fdprint(int fd, const char *msg) {
+  const size_t smsg = strlen(msg);
+  if (smsg != 0U + write(fd, msg, smsg)) exit(121);
+}
+
 int main(int argc, char **argv) {
-  char *prog;
-  char *ldso0;
+  char *prog, *ldso0, *argv0;
   char *dir = argv[0][0] == '\0' ? strdup("x") : strdup(readlink_alloc_all(
       strstr(argv[0], "/") ? argv[0] : "/proc/self/exe"));
   char *p;
   char **args, **argp;
+  const char *febemsg = "frontend";  /* Or "backend". */
+  char is_verbose = 0;
+  char is_xstatic = 0;
+  char **argi, *arg;
   for (p = dir + strlen(dir); p != dir && p[-1] != '/'; --p) {}
   if (p == dir) {
     strcpy(dir, ".");
@@ -154,7 +212,7 @@ int main(int argc, char **argv) {
    * to fix it.
    */
   argp = args = malloc(sizeof(*args) * (argc + 12));
-  *argp++ = argv[0];  /* No effect, will be ignored. */
+  *argp++ = argv0 = argv[0];  /* No effect, will be ignored. */
   /* TODO(pts): Make clang.bin configurable. */
   *argp++ = prog = strdupcat(dir, "/clang.bin", "");
   if (argv[0][0] == '/') {
@@ -165,14 +223,31 @@ int main(int argc, char **argv) {
      */
     *argp++ = path_join(get_current_dir_name(), argv[0]);
   }
-  /* It's important that we don't trigger when argv[1] is "-cc1", because
-   * clang is calling itself in this case.
+  for (argi = argv + 1; (arg = *argi) && 0 != strcmp(arg, "-v"); ++argi) {}
+  if (*argi) is_verbose = 1;
+  /* It's important that -xstatic doesn't trigger when argv[1] is "-cc1",
+   * because clang is calling itself in this case.
    */
-  if (0) {
-#ifdef USE_XSTATIC
-  } else if (argv[1] && 0 == strcmp(argv[1], "-xstatic")) {
+  if (argv[1] &&
+      (0 == strcmp(argv[1], "-xstatic") || 0 == strcmp(argv[1], "--xstatic"))) {
     ++argv;
     --argc;
+    is_xstatic = 1;
+  }
+#if USE_XSTATIC
+  if (0) {
+#else
+  if (is_xstatic) {
+    fdprint(2, "error: flag not supported: -xstatic\n");
+    exit(122);
+#endif
+  } else if (!argv[1] || (!argv[2] && 0 == strcmp(argv[1], "-v"))) {
+    /* Don't add any flags, because the user wants some version info, and with
+     * `-Wl,... -v' gcc and clang won't display version info.
+     */
+    is_verbose = 0;
+#if USE_XSTATIC
+  } else if (is_xstatic) {
     /* When adding more arguments here, increase the args malloc count. */
     /* We don't need get_autodetect_archflag(argv), we always send "-m32". */
     *argp++ = "-m32";
@@ -194,9 +269,10 @@ int main(int argc, char **argv) {
      * detected.
      */
 #endif
-  } else if (!argv[1] || 0 != strcmp(argv[1], "-cc1")) {
-    char need_linker = 1;
-    char **argi, *arg, c;
+  } else if (argv[1] && 0 == strcmp(argv[1], "-cc1")) {
+    febemsg = "backend";
+  } else {
+    char need_linker = 1, c;
     archbit_t archbit, archbit_override;
     for (argi = argv + 1; (arg = *argi); ++argi) {
       if (arg[0] != '-') continue;
@@ -230,8 +306,13 @@ int main(int argc, char **argv) {
   }
   memcpy(argp, argv + 1, argc * sizeof(*argp));
   ldso0 = strdupcat(dir, "/../binlib/ld0.so", "");
+  if (is_verbose) {
+    args[0] = ldso0;
+    fdprint(2, escape_argv(
+        strdupcat("info: running clang ", febemsg, ":\n"), args, "\n"));
+  }
+  args[0] = argv0;
   execv(ldso0, args);
-  p = strdupcat("error: clang: exec failed: ", prog, "\n");
-  (void)!write(2, p, strlen(p));
+  fdprint(2, strdupcat("error: clang: exec failed: ", prog, "\n"));
   return 120;
 }
