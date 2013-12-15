@@ -16,9 +16,13 @@ Modifications of the clang+llvm-3.3-i386-debian6.tar.bz2 download:
 * added ld0.so
 * renamed rpath directory
 
-Info:
+Developer info:
 
 * clang doesn't add C++ header directories when compiling C code.
+* Less than 100 bytes slower if using `static inline void *mymalloc(size_t size) {
+  return sbrk((size + 15) & ~15); }'. Maybe uClibc uses malloc internally.
+* http://llvm.org/releases/3.3/clang+llvm-3.3-i386-debian6.tar.bz2 doesn't
+  contain crtbegin.o etc, we've fetched it from uClibc.
 
 TODOs:
 
