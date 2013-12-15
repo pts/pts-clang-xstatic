@@ -454,7 +454,7 @@ int main(int argc, char **argv) {
        * systems which don't provide it.
        */
       *argp++ = "-idirafter";  /* Add with low priority. */
-      *argp++ = strdupcat(dir, "/../include64low", "");
+      *argp++ = strdupcat(dir, "/../clanginc64low", "");
     }
   }
   memcpy(argp, argv + 1, argc * sizeof(*argp));
