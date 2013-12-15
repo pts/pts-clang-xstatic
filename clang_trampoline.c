@@ -300,7 +300,7 @@ int main(int argc, char **argv) {
        * libc.a .
        */
       *argp++ = strdupcat("-L", dir, "/../xstaticfld");
-      *argp++ = strdupcat("-L", dir, "/../usr/lib");
+      *argp++ = strdupcat("-L", dir, "/../uclibcusr/lib");
       for (argi = argv + 1; (arg = *argi); ++argi) {
         if (0 == strcmp(arg, "-z") &&
             argi[1] && 0 == strcmp(argi[1], "relro")) {
@@ -422,9 +422,9 @@ int main(int argc, char **argv) {
      * matter, it will be added after -isystem) just like in regular clang.
      */
     *argp++ = "-cxx-isystem";
-    *argp++ = strdupcat(dir, "/../usr/c++include", "");
+    *argp++ = strdupcat(dir, "/../uclibcusr/c++include", "");
     *argp++ = "-isystem";
-    p = strdupcat(dir, "/../usr/include", "");
+    p = strdupcat(dir, "/../uclibcusr/include", "");
     if (0 != stat(p, &st) || !S_ISDIR(st.st_mode)) goto dir_missing;
     *argp++ = p;
     p = strdupcat(dir, "/../xstaticfld/ld.bin", "");
@@ -434,9 +434,9 @@ int main(int argc, char **argv) {
           "error: file missing for -xstatic, please install: ", p, "\n"));
       return 123;
     }
-    p = strdupcat(dir, "/../usr/lib/libc.a", "");
+    p = strdupcat(dir, "/../uclibcusr/lib/libc.a", "");
     if (0 != stat(p, &st) || !S_ISREG(st.st_mode)) goto file_missing;
-    p = strdupcat(dir, "/../usr/lib/crt1.o", "");
+    p = strdupcat(dir, "/../uclibcusr/lib/crt1.o", "");
     if (0 != stat(p, &st) || !S_ISREG(st.st_mode)) goto file_missing;
     p = strdupcat(dir, "/../xstaticfld/crtbeginT.o", "");
     if (0 != stat(p, &st) || !S_ISREG(st.st_mode)) goto file_missing;
