@@ -24,6 +24,17 @@ Developer info:
 * http://llvm.org/releases/3.3/clang+llvm-3.3-i386-debian6.tar.bz2 doesn't
   contain crtbegin.o etc, we've fetched it from uClibc.
 * `ld --eh-frame-hdr' is used by g++
+* Moving ld from xstatic/i486-linux-gnu/bin to xstatic/i486-linux-gnu
+  prevents clang from recognizing it.
+* clang++ would find these include directories if they existed:
+  xstatic/include/c++ and xstatic/include/c++/4.1 . It would find them as:
+  xstatic/lib/gcc/i486-linux-gnu/4.1/../../../../include/c++/4.1 .
+* With -gcc-toolchain, clang-static usr/lib/gcc/i486-linux-gnu/4.1 must not
+  be a symlink, but 4.1.x or 4.1.y also works as a directory component; if
+  that's missing, clang -gcc-toolchain wouldn't even find its ld;
+  i386-linux-gnu can be a symlink. usr/lib/gcc/i486-linux-gnu can be a
+  symlink, but it can't start with `../' . The 4.1 pathname component cannot
+  be omitted. Not even gcc can be a symlink to ... .
 
 TODOs:
 

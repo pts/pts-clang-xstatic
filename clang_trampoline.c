@@ -229,9 +229,15 @@ int main(int argc, char **argv) {
      * --build-id (because not supported by old ld)
      * -z relro (because it increases the binary size and it's useless for static)
      */
-    argp = args = malloc(sizeof(*args) * (argc + 3));
+    argp = args = malloc(sizeof(*args) * (argc + 4));
     *argp++ = argv0 = *argv++;
     *argp++ = "-nostdlib";  /* No system directories to find .a files please. */
+    /* We put gccld with libgcc.a first, because clang puts
+     * /usr/lib/gcc/i486-linux-gnu/4.4 with libgcc.a before /usr/lib with
+     * libc.a .
+     */
+    *argp++ = strdupcat("-L", dir, "/../gccld");
+    *argp++ = strdupcat("-L", dir, "/../usr/lib");
     for (; (arg = *argv); ++argv) {
       if (0 == strcmp(arg, "-z") && argv[1] && 0 == strcmp(argv[1], "relro")) {
         ++argv;  /* Skip and drop both arguments: -z relro */
@@ -246,12 +252,16 @@ int main(int argc, char **argv) {
     }
     *argp = NULL;
     prog = strdupcat(argv0, ".bin", "");  /* "ld.bin". */
+    args[0] = prog;
+#if 0  /* Can't detect if `clang -v' was specified, so don't pollute. */
+    fdprint(2, escape_argv("info: running ld:\n", args, "\n"));
+#endif
     execv(prog, args);
     fdprint(2, strdupcat("error: clang-ld: exec failed: ", prog, "\n"));
     return 120;
   }
 
-  /* RPATH=$ORIGIN/../binlib (set manually in clang.bin) takes care of this */
+  /* RPATH=$ORIGIN/../binlib (set manually in clang.bin) takes care. */
   /* in clang.bin /proc/self/exE was modified to /proc/self/exe */
   /* LD0LIBRARY_PATH is needed so ld0.so doesn't consult /etc/ld.so.cache.
    * Please note that /lib/ld-linux.so.2 consults LD_LIBRARY_PATH, which ld0.so
@@ -264,7 +274,7 @@ int main(int argc, char **argv) {
    * ... and believed it's ld-linux.so.2. I edited the binary to /proc/self/exE
    * to fix it.
    */
-  argp = args = malloc(sizeof(*args) * (argc + 12));
+  argp = args = malloc(sizeof(*args) * (argc + 13));
   *argp++ = argv0 = argv[0];  /* No effect, will be ignored. */
   /* TODO(pts): Make clang.bin configurable. */
   *argp++ = prog = strdupcat(dir, "/clang.bin", "");
@@ -311,13 +321,14 @@ int main(int argc, char **argv) {
      */
     *argp++ = "-Qunused-arguments";
     *argp++ = "-nostdinc";
-    *argp++ = strdupcat("-I", dir, "/../lib/clang/cur/include");
-    *argp++ = strdupcat("-I", dir, "/../xstatic/include");
+    *argp++ = "-nostdinc++";
+    *argp++ = strdupcat("-isystem", dir, "/../lib/clang/cur/include");
+    *argp++ = strdupcat("-isystem", dir, "/../usr/include");
+    *argp++ = strdupcat("-cxx-isystem", dir, "/../usr/c++include");
     /* The linker would be ../xstatic/i486-linux-gnu/bin/ld, which is also
      * a trampoline binary of ours.
      */
-    *argp++ = "-gcc-toolchain";
-    *argp++ = strdupcat(dir, "/../xstatic", "");
+    *argp++ = strdupcat("-B", dir, "/../gccld");
     /* Run `clang -print-search-dirs' to confirm that it was properly
      * detected.
      */
