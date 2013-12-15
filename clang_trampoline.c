@@ -268,6 +268,37 @@ static void detect_nostdinc(char **argv,
   }
 }
 
+/** Return NULL if not found. Return cmd if it contains a slash. */
+static char *find_on_path(const char *cmd) {
+  const char *path;
+  char *pathname;
+  const char *p, *q;
+  size_t scmd, s;
+  struct stat st;
+  if (strstr(cmd, "/")) {
+    if (0 == stat(cmd, &st) && !S_ISDIR(st.st_mode)) {
+      return strdupcat(cmd, "", "");
+    }
+  } else {
+    path = getenv("PATH");
+    if (!path || !path[0]) path = "/bin:/usr/bin";
+    scmd = strlen(cmd);
+    for (p = path; *p != '\0'; p = q + 1) {
+      for (q = p; *q != '\0' && *q != ':'; ++q) {}
+      s = q - p;
+      pathname = malloc(s + 2 + scmd);
+      memcpy(pathname, p, s);
+      pathname[s] = '/';
+      strcpy(pathname + s + 1, cmd);
+      if (0 == stat(pathname, &st) && !S_ISDIR(st.st_mode)) return pathname;
+      free(pathname);  /* TODO(pts): Realloc. */
+      if (*q == '\0') break;
+    }
+  }
+  return NULL;
+}
+
+
 typedef enum ldmode_t {
   LM_XCLANGLD = 0,  /* Use the ld and -lgcc shipped with clang. */
   LM_XSYSLD = 1,
@@ -276,8 +307,7 @@ typedef enum ldmode_t {
 
 int main(int argc, char **argv) {
   char *prog, *ldso0, *argv0;
-  char *dir = argv[0][0] == '\0' ? strdup("x") : strdup(readlink_alloc_all(
-      strstr(argv[0], "/") ? argv[0] : "/proc/self/exe"));
+  char *dir, *dirup;
   char *p;
   char **args, **argp;
   const char *febemsg = "frontend";  /* Or "backend". */
@@ -286,12 +316,26 @@ int main(int argc, char **argv) {
   char **argi, *arg;
   char has_nostdinc, has_nostdincxx;
 
+  dir = find_on_path(argv[0]);
+  if (!dir) {
+    fdprint(2, "xstatic: error: could not find myself on $PATH\n");
+    return 122;
+  }
+  dir = readlink_alloc_all(dir);
   for (p = dir + strlen(dir); p != dir && p[-1] != '/'; --p) {}
   if (p == dir) {
     strcpy(dir, ".");
   } else {
     p[-1] = '\0';
   }
+  dirup = strdupcat(dir, "", "");
+  for (p = dirup + strlen(dirup); p != dirup && p[-1] != '/'; --p) {}
+  if (p == dirup || (dirup[0] == '/' && dirup[1] == '\0')) {
+    fdprint(2, strdupcat("xstatic: error: no parent dir for: ", dir, "\n"));
+    return 122;
+  }
+  p[-1] = '\0';  /* Remove basename of dirup. */
+
   if (detect_linker(argv)) {  /* clang trampoline runs as as ld. */
     /* Please note that we are only invoked for `clang -xstatic', because
      * without -xstatic, the ld symlink is outside of the clang program search
@@ -329,8 +373,8 @@ int main(int argc, char **argv) {
        * /usr/lib/gcc/i486-linux-gnu/4.4 with libgcc.a before /usr/lib with
        * libc.a .
        */
-      *argp++ = strdupcat("-L", dir, "/../xstaticfld");
-      *argp++ = strdupcat("-L", dir, "/../uclibcusr/lib");
+      *argp++ = strdupcat("-L", dirup, "/xstaticfld");
+      *argp++ = strdupcat("-L", dirup, "/uclibcusr/lib");
       for (argi = argv + 1; (arg = *argi); ++argi) {
         if (0 == strcmp(arg, "-z") &&
             argi[1] && 0 == strcmp(argi[1], "relro")) {
@@ -461,7 +505,7 @@ int main(int argc, char **argv) {
     *argp++ = "-nostdinc++";
     if (!has_nostdinc) {
       *argp++ = "-isystem";
-      p = strdupcat(dir, "/../clanginclude", "");
+      p = strdupcat(dirup, "/clanginclude", "");
       if (0 != stat(p, &st) || !S_ISDIR(st.st_mode)) {
        dir_missing:
         fdprint(2, strdupcat(
@@ -475,31 +519,31 @@ int main(int argc, char **argv) {
        * matter, it will be added after -isystem) just like in regular clang.
        */
       *argp++ = "-cxx-isystem";
-      *argp++ = strdupcat(dir, "/../uclibcusr/c++include", "");
+      *argp++ = strdupcat(dirup, "/uclibcusr/c++include", "");
     }
     if (!has_nostdinc) {
       *argp++ = "-isystem";
-      p = strdupcat(dir, "/../uclibcusr/include", "");
+      p = strdupcat(dirup, "/uclibcusr/include", "");
       if (0 != stat(p, &st) || !S_ISDIR(st.st_mode)) goto dir_missing;
       *argp++ = p;
     }
-    p = strdupcat(dir, "/../xstaticfld/ld.bin", "");
+    p = strdupcat(dirup, "/xstaticfld/ld.bin", "");
     if (0 != stat(p, &st) || !S_ISREG(st.st_mode)) {
      file_missing:
       fdprint(2, strdupcat(
           "error: file missing for -xstatic, please install: ", p, "\n"));
       return 123;
     }
-    p = strdupcat(dir, "/../uclibcusr/lib/libc.a", "");
+    p = strdupcat(dirup, "/uclibcusr/lib/libc.a", "");
     if (0 != stat(p, &st) || !S_ISREG(st.st_mode)) goto file_missing;
-    p = strdupcat(dir, "/../uclibcusr/lib/crt1.o", "");
+    p = strdupcat(dirup, "/uclibcusr/lib/crt1.o", "");
     if (0 != stat(p, &st) || !S_ISREG(st.st_mode)) goto file_missing;
-    p = strdupcat(dir, "/../xstaticfld/crtbeginT.o", "");
+    p = strdupcat(dirup, "/xstaticfld/crtbeginT.o", "");
     if (0 != stat(p, &st) || !S_ISREG(st.st_mode)) goto file_missing;
     /* The linker would be ../xstaticfld/ld, which is also a trampoline binary
      * of ours.
      */
-    *argp++ = strdupcat("-B", dir, "/../xstaticfld");
+    *argp++ = strdupcat("-B", dirup, "/xstaticfld");
     /* Run `clang -print-search-dirs' to confirm that it was properly
      * detected.
      */
@@ -544,9 +588,9 @@ int main(int argc, char **argv) {
          * TODO(pts): In linker mode, check the 64-bitness of crt1.o and
          * compatibility with `-m elf_x86_64'.
          */
-        *argp++ = strdupcat("-B", dir, "/../clangld64");
+        *argp++ = strdupcat("-B", dirup, "/clangld64");
       } else {
-        *argp++ = strdupcat("-B", dir, "/../clangld32");
+        *argp++ = strdupcat("-B", dirup, "/clangld32");
       }
       if (need_linker) {
         *argp++ = "-static-libgcc";
@@ -561,18 +605,18 @@ int main(int argc, char **argv) {
     }
     if (!has_nostdinc) {
       *argp++ = "-isystem";
-      *argp++ = strdupcat(dir, "/../clanginclude", "");
+      *argp++ = strdupcat(dirup, "/clanginclude", "");
     }
     if (archbit == ARCHBIT_64 && !has_nostdinc) {
       /* Let the compiler find our replacement for gnu/stubs-64.h on 32-bit
        * systems which don't provide it.
        */
       *argp++ = "-idirafter";  /* Add with low priority. */
-      *argp++ = strdupcat(dir, "/../clanginc64low", "");
+      *argp++ = strdupcat(dirup, "/clanginc64low", "");
     }
   }
   memcpy(argp, argv + 1, argc * sizeof(*argp));
-  ldso0 = strdupcat(dir, "/../binlib/ld0.so", "");
+  ldso0 = strdupcat(dirup, "/binlib/ld0.so", "");
   if (is_verbose) {
     args[0] = ldso0;
     fdprint(2, escape_argv(

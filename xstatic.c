@@ -295,6 +295,36 @@ static void detect_nostdinc(char **argv,
   }
 }
 
+/** Return NULL if not found. Return cmd if it contains a slash. */
+static char *find_on_path(const char *cmd) {
+  const char *path;
+  char *pathname;
+  const char *p, *q;
+  size_t scmd, s;
+  struct stat st;
+  if (strstr(cmd, "/")) {
+    if (0 == stat(cmd, &st) && !S_ISDIR(st.st_mode)) {
+      return strdupcat(cmd, "", "");
+    }
+  } else {
+    path = getenv("PATH");
+    if (!path || !path[0]) path = "/bin:/usr/bin";
+    scmd = strlen(cmd);
+    for (p = path; *p != '\0'; p = q + 1) {
+      for (q = p; *q != '\0' && *q != ':'; ++q) {}
+      s = q - p;
+      pathname = malloc(s + 2 + scmd);
+      memcpy(pathname, p, s);
+      pathname[s] = '/';
+      strcpy(pathname + s + 1, cmd);
+      if (0 == stat(pathname, &st) && !S_ISDIR(st.st_mode)) return pathname;
+      free(pathname);  /* TODO(pts): Realloc. */
+      if (*q == '\0') break;
+    }
+  }
+  return NULL;
+}
+
 typedef struct lang_t {
   char is_cxx;
   char is_clang;
@@ -364,36 +394,6 @@ static void detect_lang(char **argv, lang_t *lang) {
   }
 }
 
-/** Return NULL if not found. Return cmd if it contains a slash. */
-static char *find_on_path(const char *cmd) {
-  const char *path;
-  char *pathname;
-  const char *p, *q;
-  size_t scmd, s;
-  struct stat st;
-  if (strstr(cmd, "/")) {
-    if (0 == stat(cmd, &st) && !S_ISDIR(st.st_mode)) {
-      return strdupcat(cmd, "", "");
-    }
-  } else {
-    path = getenv("PATH");
-    if (!path || !path[0]) path = "/bin:/usr/bin";
-    scmd = strlen(cmd);
-    for (p = path; *p != '\0'; p = q + 1) {
-      for (q = p; *q != '\0' && *q != ':'; ++q) {}
-      s = q - p;
-      pathname = malloc(s + 2 + scmd);
-      memcpy(pathname, p, s);
-      pathname[s] = '/';
-      strcpy(pathname + s + 1, cmd);
-      if (0 == stat(pathname, &st) && !S_ISDIR(st.st_mode)) return pathname;
-      free(pathname);  /* TODO(pts): Realloc. */
-      if (*q == '\0') break;
-    }
-  }
-  return NULL;
-}
-
 typedef enum ldmode_t {
   LM_XCLANGLD = 0,  /* Use the ld and -lgcc shipped with clang. */
   LM_XSYSLD = 1,
@@ -403,7 +403,7 @@ typedef enum ldmode_t {
 int main(int argc, char **argv) {
   /* !! not probed yet */
   char *prog;
-  char *dir;
+  char *dir, *dirup;
   char *p;
   char **args, **argp;
   char is_verbose = 0;
@@ -420,8 +420,15 @@ int main(int argc, char **argv) {
   if (p == dir) {
     strcpy(dir, ".");
   } else {
-    p[-1] = '\0';
+    p[-1] = '\0';  /* Remove basename of dir. */
   }
+  dirup = strdupcat(dir, "", "");
+  for (p = dirup + strlen(dirup); p != dirup && p[-1] != '/'; --p) {}
+  if (p == dirup || (dirup[0] == '/' && dirup[1] == '\0')) {
+    fdprint(2, strdupcat("xstatic: error: no parent dir for: ", dir, "\n"));
+    return 122;
+  }
+  p[-1] = '\0';  /* Remove basename of dirup. */
 
   if (detect_linker(argv)) {  /* clang trampoline runs as as ld. */
     char is_static = 0;
@@ -454,8 +461,8 @@ int main(int argc, char **argv) {
      * /usr/lib/gcc/i486-linux-gnu/4.4 with libgcc.a before /usr/lib with
      * libc.a .
      */
-    *argp++ = strdupcat("-L", dir, "/../xstaticfld");
-    *argp++ = strdupcat("-L", dir, "/../uclibcusr/lib");
+    *argp++ = strdupcat("-L", dirup, "/xstaticfld");
+    *argp++ = strdupcat("-L", dirup, "/uclibcusr/lib");
     for (argi = argv + 1; (arg = *argi); ++argi) {
       if (0 == strcmp(arg, "-z") &&
           argi[1] && 0 == strcmp(argi[1], "relro")) {
@@ -506,20 +513,20 @@ int main(int argc, char **argv) {
   }
   check_bflags(argv);
   check_xflags(argv);
-  p = strdupcat(dir, "/../xstaticcld/ld.bin", "");
+  p = strdupcat(dirup, "/xstaticcld/ld.bin", "");
   if (0 != stat(p, &st) || !S_ISREG(st.st_mode)) {
    file_missing:
     fdprint(2, strdupcat(
         "xstatic: error: file missing, please install: ", p, "\n"));
     return 123;
   }
-  p = strdupcat(dir, "/../uclibcusr/lib/libc.a", "");
+  p = strdupcat(dirup, "/uclibcusr/lib/libc.a", "");
   if (0 != stat(p, &st) || !S_ISREG(st.st_mode)) goto file_missing;
-  p = strdupcat(dir, "/../uclibcusr/include/stdio.h", "");
+  p = strdupcat(dirup, "/uclibcusr/include/stdio.h", "");
   if (0 != stat(p, &st) || !S_ISREG(st.st_mode)) goto file_missing;
-  p = strdupcat(dir, "/../uclibcusr/lib/crt1.o", "");
+  p = strdupcat(dirup, "/uclibcusr/lib/crt1.o", "");
   if (0 != stat(p, &st) || !S_ISREG(st.st_mode)) goto file_missing;
-  p = strdupcat(dir, "/../xstaticcld/crtbeginT.o", "");
+  p = strdupcat(dirup, "/xstaticcld/crtbeginT.o", "");
   if (0 != stat(p, &st) || !S_ISREG(st.st_mode)) goto file_missing;
   prog = find_on_path(argv[1]);
   if (!prog) {
@@ -560,13 +567,13 @@ int main(int argc, char **argv) {
     /* The linker would be ../xstaticcld/ld, which is also a trampoline binary
      * of ours.
      */
-    *argp++ = strdupcat("-B", dir, "/../xstaticcld");
+    *argp++ = strdupcat("-B", dirup, "/xstaticcld");
     if (lang.is_compiling) {
       *argp++ = "-nostdinc";
       *argp++ = "-nostdinc++";
       if (!has_nostdinc) {
         *argp++ = "-isystem";
-        p = strdupcat(dir, "/../clanginclude", "");
+        p = strdupcat(dirup, "/clanginclude", "");
         if (0 != stat(p, &st) || !S_ISDIR(st.st_mode)) {
         /* dir_missing: */
           fdprint(2, strdupcat(
@@ -581,7 +588,7 @@ int main(int argc, char **argv) {
          * matter, it will be added after -isystem) just like in regular clang.
          */
         *argp++ = "-cxx-isystem";  /* gcc doesn't have this flag */
-        *argp++ = strdupcat(dir, "/../uclibcusr/c++include", "");
+        *argp++ = strdupcat(dirup, "/uclibcusr/c++include", "");
       } else if (lang.is_cxx) {
         /* TODO(pts): Move C++ includes before C includes. */
         /* This is incorrect if there are both C and C++ source files
@@ -589,11 +596,11 @@ int main(int argc, char **argv) {
          * their include path), but we can't have better with gcc.
          */
         *argp++ = "-isystem";
-        *argp++ = strdupcat(dir, "/../uclibcusr/c++include", "");
+        *argp++ = strdupcat(dirup, "/uclibcusr/c++include", "");
       }
       if (!has_nostdinc) {
         *argp++ = "-isystem";
-        *argp++ = strdupcat(dir, "/../uclibcusr/include", "");
+        *argp++ = strdupcat(dirup, "/uclibcusr/include", "");
       }
     }
 

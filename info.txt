@@ -45,8 +45,8 @@ Developer info:
 
 TODOs:
 
-* TODO(pts): Too many ../ components in the generated ld command-line,
-             collapse them (also allow symbolic links).
+* TODO(pts): Get rid of remaining ../ components in the generated ld
+             command-line, caused by readlink.
 * TODO(pts): Get rid of redundancy between xstatic.c and clang_trampoline.c.
 * TODO(pts): Autodetect 3.3 in the clang cur symlink.
 * TODO(pts): Recompile or relink Clang 3.3 statically.
