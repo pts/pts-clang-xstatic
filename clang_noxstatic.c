@@ -2,7 +2,7 @@
     set -ex; exec ${CC:-gcc} -s -Os -fno-stack-protector \
     -W -Wall -o clang_noxstatic "$0"; exit 1
 /*
- * clang.c_noxtatic: clang trampoline for .so file redirection
+ * clang_noxstatic: clang trampoline for .so file redirection
  * by pts@fazekas.hu at Fri Dec 13 22:17:42 CET 2013
  *
  * Since our process is short-lived, we don't bother free()ing memory.
@@ -84,7 +84,6 @@ int main(int argc, char **argv) {
   }
   memcpy(argp, argv + 1, argc * sizeof(*argp));
   ldso0 = strdupcat(dir, "/../binlib/ld0.so", "");
-  /* TODO(pts): If -v specified, print the command we run */
   execv(ldso0, args);
   p = strdupcat("error: clang: exec failed: ", prog, "\n");
   (void)!write(2, p, strlen(p));

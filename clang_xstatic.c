@@ -25,14 +25,18 @@ int main(int argc, char **argv) {
   }
   /* RPATH=$ORIGIN/../binlib (set manually in clang.bin) takes care of this */
   /* in clang.bin /proc/self/exE was modified to /proc/self/exe */
-  /* Needed so ld0.so doesn't consult /etc/ld.so.cache */
+  /* LD0LIBRARY_PATH is needed so ld0.so doesn't consult /etc/ld.so.cache.
+   * Please note that /lib/ld-linux.so.2 consults LD_LIBRARY_PATH, which ld0.so
+   * ignores and vice versa. This is good so we can support dynamically linked
+   * host-specific tools.
+   */
   putenv("LD0LIBRARY_PATH=/dev/null/missing");
   /* clang was doing:
    * readlink("/proc/self/exe", ".../clang/binlib/ld-linux.so.2", ...)
    * ... and believed it's ld-linux.so.2. I edited the binary to /proc/self/exE
    * to fix it.
    */
-  argp = args = malloc(sizeof(*args) * (argc + 10));
+  argp = args = malloc(sizeof(*args) * (argc + 12));
   *argp++ = argv[0];  /* No effect, will be ignored. */
   /* TODO(pts): Make clang.bin configurable. */
   *argp++ = prog = strdupcat(dir, "/clang.bin", "");
