@@ -366,6 +366,12 @@ int main(int argc, char **argv) {
      * `-Wl,... -v' gcc and clang won't display version info.
      */
     is_verbose = 0;
+    if (argv[1]) {
+      /* TODO(pts): Move this to the end of the output, after exec. */
+      fdprint(1, "Additinal flags supported: -xstatic -xsysld\n");
+    }
+  } else if (argv[1] && 0 == strcmp(argv[1], "--help")) {
+    fdprint(1, "Additinal flags supported: -xstatic -xsysld\n");
 #if USE_XSTATIC
   } else if (ldmode == LM_XSTATIC) {
     struct stat st;
