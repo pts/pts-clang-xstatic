@@ -48,6 +48,7 @@ Developer info:
 
 TODOs:
 
+* TODO(pts): With no -fno-exceptions and gcc 4.8.2: /tmp/ccnmW0NS.o:include_many.cc:function std::vector<std::string, std::allocator<std::string> >::~vector(): error: undefined reference to '_Unwind_Resume'
 * TODO(pts): Test with the system clang.
 * TODO(pts): Get rid of remaining ../ components in the generated ld
              command-line, caused by readlink.
