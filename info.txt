@@ -42,9 +42,13 @@ Developer info:
   `/home/pts/bin.local/../prg/xstatic/gccld/ld'.
 * `ld -nostdlib' is different from `gcc -nostdlib', the latter also prevents
   -lc.
+* In addition to -B, the `ln -s . xstaticcld/i386-linux-gnu' symlink is
+  needed by gcc (but not by clang) on Ubuntu Precise so it finds the right
+  crt1.o gets found.
 
 TODOs:
 
+* TODO(pts): Test with the system clang.
 * TODO(pts): Get rid of remaining ../ components in the generated ld
              command-line, caused by readlink.
 * TODO(pts): Get rid of redundancy between xstatic.c and clang_trampoline.c.

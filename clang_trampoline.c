@@ -242,7 +242,7 @@ static char check_bflags(char **argv, char is_xstaticcld_ok) {
       had_xstaticcld = 1;
     } else if (
         (arg[0] == '-' && arg[1] == 'B') ||
-        is_argprefix(arg, "--sysroot") ||
+        (!is_xstaticcld_ok && is_argprefix(arg, "--sysroot")) ||
         is_argprefix(arg, "--gcc-toolchain")) {
       fdprint(2, strdupcat(
           "error: flag not supported in this ldmode: ", arg, "\n"));
@@ -466,7 +466,8 @@ int main(int argc, char **argv) {
             /* -L/usr/local/lib is not emitted by clang 3.3; we play safe. */
             is_dirprefix(arg, "-L/usr/local/lib") ||
             is_dirprefix(arg, "-L/usr/lib") ||
-            is_dirprefix(arg, "-L/lib")) {
+            is_dirprefix(arg, "-L/lib") ||
+            0 == strncmp(arg, "--sysroot=", 10)) {
           /* Omit this argument. */
         } else if (0 == strcmp(arg, "-lstdc++")) {
           /* Fixup for linker errors: undefined reference to

@@ -473,7 +473,8 @@ int main(int argc, char **argv) {
           /* -L/usr/local/lib is not emitted by clang 3.3; we play safe. */
           is_dirprefix(arg, "-L/usr/local/lib") ||
           is_dirprefix(arg, "-L/usr/lib") ||
-          is_dirprefix(arg, "-L/lib")) {
+          is_dirprefix(arg, "-L/lib") ||
+          0 == strncmp(arg, "--sysroot=", 10)) {
         /* Omit this argument. */
       } else if (0 == strcmp(arg, "-lstdc++")) {
         /* Fixup for linker errors: undefined reference to
@@ -533,7 +534,7 @@ int main(int argc, char **argv) {
   argv[1] = argv[0];
   ++argv;
   --argc;
-  argp = args = malloc(sizeof(*args) * (argc + 17));
+  argp = args = malloc(sizeof(*args) * (argc + 18));
   *argp++ = prog;  /* Set destination argv[0]. */
   if (!argv[1] || (!argv[2] && 0 == strcmp(argv[1], "-v"))) {
     /* Don't add any flags, because the user wants some version info, and with
@@ -564,20 +565,14 @@ int main(int argc, char **argv) {
      */
     if (lang.is_compiling) {
       *argp++ = "-fno-stack-protector";
-      *argp++ = "-nostdinc";
+      /* This puts uclibcusr/include to the top of the include path, and keeps
+       * the gcc or clang headers below that. Specifying --nostdinc would
+       * remove these compiler-specific headers (e.g. stdarg.h), which we
+       * don't want removed, because libc headers depend on them.
+       */
+      *argp++ = strdupcat("--sysroot=", dirup, "/empty");
       if (lang.is_cxx) {
         *argp++ = "-nostdinc++";
-      }
-      if (!has_nostdinc) {
-        *argp++ = "-isystem";
-        p = strdupcat(dirup, "/clanginclude", "");
-        if (0 != stat(p, &st) || !S_ISDIR(st.st_mode)) {
-        /* dir_missing: */
-          fdprint(2, strdupcat(
-              "error: directory missing for -xstatic, please install: ", p, "\n"));
-          return 123;
-        }
-        *argp++ = p;
       }
       if (has_nostdincxx) {
       } else if (lang.is_clang) {
@@ -616,10 +611,6 @@ int main(int argc, char **argv) {
       }
     }
 
-    /* !! test with gcc in addition to clang
-     * In addition to -B, the gccld/i386-linux-gnu symlink is needed on Ubuntu
-     * Precise so that the right crt1.o gets found.
-     */
     if (need_linker) {
       *argp++ = "-Wl,--do-xstaticcld";
       if (is_verbose) *argp++ = "-Wl,--do-xstaticldv";
