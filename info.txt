@@ -52,12 +52,39 @@ Developer info:
 
 TODOs:
 
+* TODO(pts): Use tcc for C compilation speed comparisons.
+* TODO(pts): Add rtti test.
+* TODO(pts): Add automatic running of tests. (Shell script.)
+* TODO(pts): Document how libstdc++ was compiled.
+* TODO(pts): Should we include `backward'?
+    Ubuntu Lucid 32-bit:
+     /usr/include/c++/4.4
+     /usr/include/c++/4.4/i486-linux-gnu
+     /usr/include/c++/4.4/backward
+    Ubuntu Lucid 64-bit:
+     /usr/include/c++/4.6
+     /usr/include/c++/4.6/x86_64-linux-gnu/.
+     /usr/include/c++/4.6/backward
+    Ubuntu Lucid -32 on 64-bit:
+     /usr/include/c++/4.6
+     /usr/include/c++/4.6/x86_64-linux-gnu/32
+     /usr/include/c++/4.6/backward
+* TODO(pts): Add --oldcxx flag for 4.1. Does it work in 4.0?
+* TODO(pts): Document minimum g++ version: 4.2. 4.1 gives too many errors.
+             Does gcc-4.1 work? yes.
+* TODO(pts): Create libstdc++ .patch, and remove *~ backup files.
+* TODO(pts): Does include_many.cc still compile with gcc-4.1? It does with
+             gcc-4.2 and gcc-4.3 on sintagma.
 * TODO(pts): Remove automatic linking of: libstdc++usjlj.a
 * TODO(pts): Create .7z for old and new uclibc libstdc++.
 * TODO(pts): Where should we add the C++ backward directory?
 * TODO(pts): Move our synthetic `ld -L...' flags as late as possible.
-* TODO(pts): With no -fno-exceptions and gcc 4.8.2: /tmp/ccnmW0NS.o:include_many.cc:function std::vector<std::string, std::allocator<std::string> >::~vector(): error: undefined reference to '_Unwind_Resume'
+* TODO(pts): Create clangempty with the usr/include/clang symlink for system
+  clang.
 * TODO(pts): Test with the system clang.
+  (Works with clang-3.0 after:
+  (cd empty && mkdir -p usr/include && rm -f usr/include/clang &&
+      ln -s /usr/include/clang usr/include/)
 * TODO(pts): Get rid of remaining ../ components in the generated ld
              command-line, caused by readlink.
 * TODO(pts): Get rid of redundancy between xstatic.c and clang_trampoline.c.
