@@ -457,7 +457,7 @@ int main(int argc, char **argv) {
      * /usr/lib/gcc/i486-linux-gnu/4.4 with libgcc.a before /usr/lib with
      * libc.a .
      */
-    *argp++ = strdupcat("-L", dirup, "/xstaticfld");
+    *argp++ = strdupcat("-L", dirup, "/xstaticcld");
     *argp++ = strdupcat("-L", dirup, "/uclibcusr/lib");
     for (argi = argv + 1; (arg = *argi); ++argi) {
       if (0 == strcmp(arg, "-z") &&
