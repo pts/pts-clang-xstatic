@@ -45,9 +45,17 @@ Developer info:
 * In addition to -B, the `ln -s . xstaticcld/i386-linux-gnu' symlink is
   needed by gcc (but not by clang) on Ubuntu Precise so it finds the right
   crt1.o gets found.
+* If the only functions from libstdc++.a which you need are language support
+  functions (those listed in clause 18 of the standard, e.g., new and
+  delete), then try linking against libsupc++.a, which is a subset of
+  libstdc++.a.
 
 TODOs:
 
+* TODO(pts): Remove automatic linking of: libstdc++usjlj.a
+* TODO(pts): Create .7z for old and new uclibc libstdc++.
+* TODO(pts): Where should we add the C++ backward directory?
+* TODO(pts): Move our synthetic `ld -L...' flags as late as possible.
 * TODO(pts): With no -fno-exceptions and gcc 4.8.2: /tmp/ccnmW0NS.o:include_many.cc:function std::vector<std::string, std::allocator<std::string> >::~vector(): error: undefined reference to '_Unwind_Resume'
 * TODO(pts): Test with the system clang.
 * TODO(pts): Get rid of remaining ../ components in the generated ld
