@@ -580,28 +580,32 @@ int main(int argc, char **argv) {
       *argp++ = "-fno-stack-protector";
       *argp++ = "-nostdinc";
       *argp++ = "-nostdinc++";
-      if (!has_nostdinc) {
+      if (lang.is_cxx && !has_nostdincxx) {
+        /* It's important not to use the Clang flag -cxx-isystem here, because
+         * that adds C++ includes after C includes, but we need the other way
+         * round (because of conflicting files, e.g. complex.h, tgmath.h,
+         * fenv.h).
+         */
         *argp++ = "-isystem";
+        *argp++ = strdupcat(dirup, "/uclibcusr/c++include", "");
+      }
+      if (!has_nostdinc) {
+        p = strdupcat(dirup, "/uclibcusr/include", "");
+        if (0 != stat(p, &st) || !S_ISDIR(st.st_mode)) goto dir_missing;
+        *argp++ = "-isystem";
+        *argp++ = p;
+
+        /* It's important to keep clanginclude the last, for consistency.
+         */
         p = strdupcat(dirup, "/clanginclude", "");
         if (0 != stat(p, &st) || !S_ISDIR(st.st_mode)) {
          dir_missing:
           fdprint(2, strdupcat(
-              "error: directory missing for -xstatic, please install: ", p, "\n"));
+              "error: directory missing for -xstatic, please install: ", p,
+              "\n"));
           return 123;
         }
-        *argp++ = p;
-      }
-      if (!has_nostdincxx) {
-        /* TODO(pts): Move C++ includes before C includes (-cxx-isystem doesn't
-         * matter, it will be added after -isystem) just like in regular clang.
-         */
-        *argp++ = "-cxx-isystem";
-        *argp++ = strdupcat(dirup, "/uclibcusr/c++include", "");
-      }
-      if (!has_nostdinc) {
         *argp++ = "-isystem";
-        p = strdupcat(dirup, "/uclibcusr/include", "");
-        if (0 != stat(p, &st) || !S_ISDIR(st.st_mode)) goto dir_missing;
         *argp++ = p;
       }
     }
@@ -684,7 +688,7 @@ int main(int argc, char **argv) {
     }
     if (lang.is_compiling) {
       if (!has_nostdinc) {
-        *argp++ = "-isystem";
+        *argp++ = "-idirafter";
         *argp++ = strdupcat(dirup, "/clanginclude", "");
       }
       if (archbit == ARCHBIT_64 && !has_nostdinc) {

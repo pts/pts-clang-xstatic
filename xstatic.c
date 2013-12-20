@@ -578,23 +578,32 @@ int main(int argc, char **argv) {
        */
       *argp++ = "-fno-stack-protector";
       if (lang.is_cxx) {
+        /* Glitch: It's not possible to disable the gcc warning ``cc1: warning:
+         * command line option "-nostdinc++" is valid for C++/ObjC++ but not
+         * for C'', there is no such clang warning. Example invocation (with
+         * both .c and .cc files): ``xstatic gcc -c -W -Wall -O2 co.c
+         * hello.cc''.
+         */
         *argp++ = "-nostdinc++";
-      }
-      if (has_nostdincxx) {
-      } else if (lang.is_clang) {
-        /* TODO(pts): Move C++ includes before C includes (-cxx-isystem doesn't
-         * matter, it will be added after -isystem) just like in regular clang.
-         */
-        *argp++ = "-cxx-isystem";  /* gcc doesn't have this flag */
-        *argp++ = strdupcat(dirup, "/uclibcusr/c++include", "");
-      } else if (lang.is_cxx) {
-        /* TODO(pts): Move C++ includes before C includes. */
-        /* This is incorrect if there are both C and C++ source files
-         * specified (because C source files mustn't have C++ headers on
-         * their include path), but we can't have better with gcc.
-         */
-        *argp++ = "-isystem";
-        *argp++ = strdupcat(dirup, "/uclibcusr/c++include", "");
+        if (!has_nostdincxx) {
+          /* Clang has -cxx-isystem, which is a no-op when compiling C code,
+           * but it adds the directory after the regular -isystem. But we need
+           * the C++ headers in front of the C headers (because of conflicting
+           * files, e.g. complex.h, tgmath.h, fenv.h).
+           *
+           * So we don't use -cxx-isystem, but we use -isystem uniformly for
+           * Clang and GCC.
+           *
+           * A small glitch: if there are both C and C++ source files
+           * specified (because C source files mustn't have C++ headers on
+           * their include path), and a non-C++ compiler is used (e.g.
+           * ``xstatic gcc -c -W -Wall -O2 helloco.c hello.cc''), then
+           * `#include <vector>' in the .c file would find the C++ vector
+           * header, and fail with a confusing error message when parsing it.
+           */
+          *argp++ = "-isystem";
+          *argp++ = strdupcat(dirup, "/uclibcusr/c++include", "");
+        }
       }
       if (!has_nostdinc) {
         *argp++ = "-isystem";

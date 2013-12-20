@@ -82,9 +82,6 @@ TODOs:
 * TODO(pts): Move our synthetic `ld -L...' flags as late as possible.
 * TODO(pts): Get rid of remaining ../ components in the generated ld
              command-line, caused by readlink.
-* TODO(pts): At least document include direcory order for various modes
-             (clang++, g++, xstatic clang++, xstatic g++), now it looks like
-             a mess.
 * TODO(pts): Get rid of redundancy between xstatic.c and clang_trampoline.c.
 * TODO(pts): Autodetect 3.3 in the clang cur symlink.
 * TODO(pts): Recompile or relink Clang 3.3 statically.
