@@ -49,6 +49,8 @@ Developer info:
   functions (those listed in clause 18 of the standard, e.g., new and
   delete), then try linking against libsupc++.a, which is a subset of
   libstdc++.a.
+* clang always opens /etc/lsb-release, it's hardwired to DetectDistro,
+  impossible to get rid of.
 
 TODOs:
 
@@ -69,34 +71,30 @@ TODOs:
      /usr/include/c++/4.6
      /usr/include/c++/4.6/x86_64-linux-gnu/32
      /usr/include/c++/4.6/backward
-* TODO(pts): Add --oldcxx flag for 4.1. Does it work in 4.0?
+* TODO(pts): Add --oldcxx flag for 4.1 (which would use an old libstdc++). Does
+             it work in 4.0?
 * TODO(pts): Document minimum g++ version: 4.2. 4.1 gives too many errors.
              Does gcc-4.1 work? yes.
 * TODO(pts): Create libstdc++ .patch, and remove *~ backup files.
-* TODO(pts): Does include_many.cc still compile with gcc-4.1? It does with
-             gcc-4.2 and gcc-4.3 on sintagma.
-* TODO(pts): Remove automatic linking of: libstdc++usjlj.a
+* TODO(pts): Remove automatic linking of: libstdc++usjlj.a , integrate to
+             old libstdc++.a?
 * TODO(pts): Create .7z for old and new uclibc libstdc++.
-* TODO(pts): Where should we add the C++ backward directory?
 * TODO(pts): Move our synthetic `ld -L...' flags as late as possible.
-* TODO(pts): Create clangempty with the usr/include/clang symlink for system
-  clang.
-* TODO(pts): Test with the system clang.
-  (Works with clang-3.0 after:
-  (cd empty && mkdir -p usr/include && rm -f usr/include/clang &&
-      ln -s /usr/include/clang usr/include/)
 * TODO(pts): Get rid of remaining ../ components in the generated ld
              command-line, caused by readlink.
+* TODO(pts): At least document include direcory order for various modes
+             (clang++, g++, xstatic clang++, xstatic g++), now it looks like
+             a mess.
 * TODO(pts): Get rid of redundancy between xstatic.c and clang_trampoline.c.
 * TODO(pts): Autodetect 3.3 in the clang cur symlink.
 * TODO(pts): Recompile or relink Clang 3.3 statically.
-* TODO(pts): Make clang not open /etc/lsb-release (DetectDistro, impossible).
 * TODO(pts): Does LM_CLANGLD need -lgcc? Which symbols?
 * TODO(pts): Why is include_many.cc 160 bytes larger without -xsysld?
 * TODO(pts): Write README.txt for all 3 projects.
 * TODO(pts): Upgrade the pts-clang-xstatic linker? It seems to work fine.
-* TODO(pts): Document new conditions in usr/include/bits/cpp_type_traits.h
+* TODO(pts): Document new conditions in usr/include/bits/cpp_type_traits.h,
+*            usr/include/bits/builtin_type_traits.h,
 *            and usr/include/limits and other libstdc++ changes.
-* TODO(pts): Rewrite xstatic in C once we have Clang support.
 * TODO(pts): Test non-xstatic exception handling in many g++ and Clang versions.
-* TODO(pts): Detect wrong crt1.o (in /usr/lib/i386-linux-gnu etc.).
+* TODO(pts): Detect wrong crt1.o (e.g. in /usr/lib/i386-linux-gnu etc.) in
+*            the ld command-line.

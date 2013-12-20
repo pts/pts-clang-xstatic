@@ -316,10 +316,11 @@ typedef struct lang_t {
   char is_compiling;
 } lang_t;
 
-static void detect_lang(char **argv, lang_t *lang) {
-  char **argi, *arg, *basename, *ext;
+static void detect_lang(const char *prog, char **argv, lang_t *lang) {
+  char **argi;
+  const char *arg, *basename, *ext;
   lang->is_compiling = 0;
-  arg = argv[0];
+  arg = prog;
   for (basename = arg + strlen(arg); basename != arg && basename[-1] != '/';
        --basename) {}
   lang->is_cxx = strstr(basename, "++") != NULL;
@@ -563,7 +564,7 @@ int main(int argc, char **argv) {
     check_bflags(argv, 0);
     need_linker = detect_need_linker(argv);
     detect_nostdinc(argv, &has_nostdinc, &has_nostdincxx);
-    detect_lang(argv, &lang);
+    detect_lang(argv[0], argv, &lang);
 
     /* When adding more arguments here, increase the args malloc count. */
     /* We don't need get_autodetect_archflag(argv), we always send "-m32". */
@@ -644,7 +645,7 @@ int main(int argc, char **argv) {
     lang_t lang;
     if (check_bflags(argv, ldmode == LM_XCLANGLD)) ldmode = LM_XSYSLD;
     need_linker = detect_need_linker(argv);
-    detect_lang(argv, &lang);
+    detect_lang(argv[0], argv, &lang);
     detect_nostdinc(argv, &has_nostdinc, &has_nostdincxx);
     archbit = get_archbit_detected(argv);
     archbit_override = get_archbit_override(archbit);

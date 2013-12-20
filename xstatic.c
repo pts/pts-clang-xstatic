@@ -331,10 +331,11 @@ typedef struct lang_t {
   char is_compiling;
 } lang_t;
 
-static void detect_lang(char **argv, lang_t *lang) {
-  char **argi, *arg, *basename, *ext;
+static void detect_lang(const char *prog, char **argv, lang_t *lang) {
+  char **argi;
+  const char *arg, *basename, *ext;
   lang->is_compiling = 0;
-  arg = argv[0];
+  arg = prog;
   for (basename = arg + strlen(arg); basename != arg && basename[-1] != '/';
        --basename) {}
   lang->is_cxx = strstr(basename, "++") != NULL;
@@ -547,7 +548,7 @@ int main(int argc, char **argv) {
     lang_t lang;
     need_linker = detect_need_linker(argv);
     detect_nostdinc(argv, &has_nostdinc, &has_nostdincxx);
-    detect_lang(argv, &lang);
+    detect_lang(prog, argv, &lang);
 
     /* When adding more arguments here, increase the args malloc count. */
     /* We don't need get_autodetect_archflag(argv), we always send "-m32". */
@@ -557,20 +558,25 @@ int main(int argc, char **argv) {
      * of ours.
      */
     *argp++ = strdupcat("-B", dirup, "/xstaticcld");
-    /*
-     * Without this we get the following error compiling binutils 2.20.1:
-     * chew.c:(.text+0x233f): undefined reference to `__stack_chk_fail'
-     * We can't implement this in a compatible way, glibc gcc generates %gs:20,
-     * uClibc-0.9.33 has symbol __stack_chk_guard.
+    /* This puts uclibcusr/include to the top of the include path, and keeps
+     * the gcc or clang headers below that. Specifying --nostdinc (when
+     * lang.is_compiling) would remove these compiler-specific headers (e.g.
+     * stdarg.h), which we don't want removed, because libc headers depend
+     * on them.
+     *
+     * TODO(pts): Make /usr/local/bin/clang also work.
      */
+    *argp++ = strdupcat("--sysroot=", dirup,
+        lang.is_clang && is_dirprefix(prog, "/usr/bin") ? "/clangempty" :
+        "/empty");
     if (lang.is_compiling) {
-      *argp++ = "-fno-stack-protector";
-      /* This puts uclibcusr/include to the top of the include path, and keeps
-       * the gcc or clang headers below that. Specifying --nostdinc would
-       * remove these compiler-specific headers (e.g. stdarg.h), which we
-       * don't want removed, because libc headers depend on them.
+      /*
+       * Without this we get the following error compiling binutils 2.20.1:
+       * chew.c:(.text+0x233f): undefined reference to `__stack_chk_fail'
+       * We can't implement this in a compatible way, glibc gcc generates %gs:20,
+       * uClibc-0.9.33 has symbol __stack_chk_guard.
        */
-      *argp++ = strdupcat("--sysroot=", dirup, "/empty");
+      *argp++ = "-fno-stack-protector";
       if (lang.is_cxx) {
         *argp++ = "-nostdinc++";
       }
