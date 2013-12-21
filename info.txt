@@ -54,7 +54,11 @@ Developer info:
 
 TODOs:
 
-* TODO(pts): Use tcc for C compilation speed comparisons.
+* TODO(pts): Use the linker in TCC as the mini linker.
+* TODO(pts): Instead of ar and ranlib, build
+  tcc-0.9.26/win32/tools/tiny_libmaker.c, make it able to use 32-bit and
+  64-bit .o files. It also includes ranlib.
+* TODO(pts): Use TCC for C compilation speed comparisons.
 * TODO(pts): Add rtti test.
 * TODO(pts): Add automatic running of tests. (Shell script.)
 * TODO(pts): Document how libstdc++ was compiled.
