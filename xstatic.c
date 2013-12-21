@@ -63,6 +63,108 @@ static char *readlink_alloc(const char *path) {
   }
 }
 
+static char *readlink_slash_alloc(char *path) {
+  char *p, *q, c;
+  for (p = path + strlen(path); p != path && p[-1] == '/'; --p) {}
+  if (p == path) return NULL;
+  for (q = p; q != path && q[-1] == '/'; --q) {}
+  for (; q != path && q[-1] != '/'; --q) {}
+  /* Don't follow symlink if ends with /.. or /. */
+  if (q[0] == '.' && (q[1] == '/' || q[1] == '\0' ||
+      (q[1] == '.' && (q[2] == '/' || q[2] == '\0')))) return NULL;
+  c = *p;
+  *p = '\0';
+  q = readlink_alloc(path);
+  *p = c;
+  return q;
+}
+
+/* Combines two pathnames to a newly allocated string. The . and .. components
+ * in the beginning of path2 are processed specially (and correctly).
+ *
+ * base must end with a '/'.
+ */
+static char *combine_paths_dotdot_alloc(const char *base, const char *path2) {
+  char *path1;
+  if (path2[0] == '/') return strdupcat(path2, "", "");
+  path1 = malloc(strlen(base) + strlen(path2) + 4);
+  strcpy(path1, base);
+  while (path2[0] == '.') {
+    if (path2[1] == '/') {
+      path2 += 2;
+      for (; path2[0] == '/'; ++path2) {}
+      continue;
+    } else if (path2[1] == '.' && path2[2] == '/' && path1[0] != '\0') {
+      /* TODO(pts): Also special-case path2 == "..". */
+      char *p, *path3;
+      struct stat sta, stb;
+      char c;
+      size_t spath1;
+      path2 += 3;
+      for (; path2[0] == '/'; ++path2) {}
+     do_path1_again:
+      spath1 = strlen(path1);
+      /* TODO(pts): Add loop limit for infinite symlinks. */
+      while ((path3 = readlink_slash_alloc(path1))) {
+        char *path4;
+        size_t spath3;
+        /* TODO(pts): Handle ../ in the beginning of path3. */
+        spath3 = strlen(path3);
+        if (path3[0] == '/') {
+          spath1 = 0;  /* Truncate on absolute symlink. */
+        } else {
+          for (p = path1 + spath1; p != path1 && p[-1] == '/'; --p) {}
+          for (; p != path1 && p[-1] != '/'; --p) {}
+          spath1 = p - path1;
+          *p = '\0';
+        }
+        path4 = malloc(spath1 + spath3 + strlen(path2) + 5);
+        memcpy(path4, path1, spath1);
+        free(path1);
+        path1 = path4;
+        memcpy(p = path4 + spath1, path3, spath3);
+        free(path3);
+        p += spath3;
+        if (spath3 != 0 && p[-1] != '/') *p++ = '/';
+        *p = '\0';
+        spath1 = p - path1;
+      }
+      strcpy(path1 + spath1, "../");
+      if (0 != lstat(path1, &sta)) { dotdot_dumb:
+        strcpy(path1 + spath1 + 3, path2);
+        return path1;
+      }
+      p = path1 + spath1;
+      for (; p != path1 && p[-1] == '/'; --p) {}
+      if (p == path1) goto dotdot_dumb;  /* Absolute /. */
+      for (; p != path1 && p[-1] != '/'; --p) {}
+      if (p[0] == '.' && p[1] == '/') {
+        if (p == path1) goto dotdot_dumb;
+        *p = '\0';
+        goto do_path1_again;
+      } else if (p[0] == '.' && p[1] == '.' && p[2] == '/') {
+        goto dotdot_dumb;
+      }
+      if (p == path1) {
+        if (0 != lstat(".", &stb) || sta.st_dev != stb.st_dev ||
+            sta.st_ino != stb.st_ino) goto dotdot_dumb;
+      } else {
+        c = p[0];
+        p[0] = '\0';  // path1 now ends with '/', it's OK.
+        if (0 != lstat(path1, &stb) ||
+            sta.st_dev != stb.st_dev || sta.st_ino != stb.st_ino) {
+          p[0] = c;
+          goto dotdot_dumb;
+        }
+      }
+    } else {
+      break;
+    }
+  }
+  strcat(path1, path2);
+  return path1;
+}
+
 /* Resolve symlinks until a non-symlink is found. */
 static char *readlink_alloc_all(const char *path) {
   char *path2, *path1 = strdup(path);
@@ -72,7 +174,7 @@ static char *readlink_alloc_all(const char *path) {
       for (p = path1 + strlen(path1); p != path1 && p[-1] != '/'; --p) {}
       if (p != path1) {
         *p = '\0';  /* Remove basename from path1. */
-        p = strdupcat(path1, "", path2);
+        p = combine_paths_dotdot_alloc(path1, path2);
         free(path2);
         path2 = p;
       }
@@ -488,6 +590,7 @@ int main(int argc, char **argv) {
   } else {
     p[-1] = '\0';  /* Remove basename of dir. */
   }
+  /* TODO(pts): If dir is a symlink, just add ../ */
   dirup = strdupcat(dir, "", "");
   for (p = dirup + strlen(dirup); p != dirup && p[-1] != '/'; --p) {}
   if (p == dirup || (dirup[0] == '/' && dirup[1] == '\0')) {
