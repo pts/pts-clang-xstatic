@@ -66,7 +66,6 @@ TODOs for the current release:
 * TODO(pts): Get rid of remaining ../ components in the generated ld
              command-line, caused by readlink.
 * TODO(pts): Add rtti test.
-* TODO(pts): Add automatic running of tests. (Shell script.)
 * TODO(pts): Should we include `backward'?
     Ubuntu Lucid 32-bit:
      /usr/include/c++/4.4
@@ -84,6 +83,7 @@ TODOs for the current release:
 
 TODOs for documentation:
 
+* TODO(pts): Document that -pg is not supported (would need gcrt1.so).
 * TODO(pts): Write README.txt for all 3 projects.
 * TODO(pts): Use TCC for C compilation speed comparisons.
 * TODO(pts): Document how libstdc++ was compiled.
