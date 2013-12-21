@@ -652,10 +652,12 @@ int main(int argc, char **argv) {
             *argp++ = strdupcat("-L", "", *argj + 3);
           }
         }
-        /* We put xstaticcld with
-         libgcc.a first, because clang puts
+        /* We put xstaticcld with libgcc.a first, because clang puts
          * /usr/lib/gcc/i486-linux-gnu/4.4 with libgcc.a before /usr/lib with
          * libc.a .
+         *
+         * We add these -L flags even if compiler -nostdlib was specified,
+         * because non-xstatic compilers do the same.
          */
         *argp++ = strdupcat("-L", dirup, "/xstaticcld");
         *argp++ = strdupcat("-L", dirup, "/uclibcusr/lib");
