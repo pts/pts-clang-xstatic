@@ -735,7 +735,7 @@ int main(int argc, char **argv) {
    * ... and believed it's ld-linux.so.2. I edited the binary to /proc/self/exE
    * to fix it.
    */
-  argp = args = malloc(sizeof(*args) * (argc + 17));
+  argp = args = malloc(sizeof(*args) * (argc + 20));
   *argp++ = argv0 = argv[0];  /* No effect, will be ignored. */
   /* TODO(pts): Make clang.bin configurable. */
   *argp++ = prog = strdupcat(dir, "/clang.bin", "");
@@ -819,6 +819,9 @@ int main(int argc, char **argv) {
          */
         *argp++ = "-isystem";
         *argp++ = strdupcat(dirup, "/uclibcusr/c++include", "");
+        /* Regular g++ libstdc++ has non-backward and then backward. */
+        *argp++ = "-isystem";
+        *argp++ = strdupcat(dirup, "/uclibcusr/c++include/backward", "");
       }
       if (!has_nostdinc) {
         p = strdupcat(dirup, "/uclibcusr/include", "");

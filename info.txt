@@ -61,21 +61,8 @@ TODOs for the current release:
 * TODO(pts): Add constructor tests.
 * TODO(pts): Remove automatic linking of: libstdc++usjlj.a , integrate to
              old libstdc++.a?
-* TODO(pts): Create .7z for old and new uclibc libstdc++.
 * TODO(pts): Add rtti test.
-* TODO(pts): Should we include `backward'?
-    Ubuntu Lucid 32-bit:
-     /usr/include/c++/4.4
-     /usr/include/c++/4.4/i486-linux-gnu
-     /usr/include/c++/4.4/backward
-    Ubuntu Lucid 64-bit:
-     /usr/include/c++/4.6
-     /usr/include/c++/4.6/x86_64-linux-gnu/.
-     /usr/include/c++/4.6/backward
-    Ubuntu Lucid -32 on 64-bit:
-     /usr/include/c++/4.6
-     /usr/include/c++/4.6/x86_64-linux-gnu/32
-     /usr/include/c++/4.6/backward
+* TODO(pts): Create .7z for old and new uclibc libstdc++.
 * TODO(pts): Create downloads, remove backup files.
 
 TODOs for documentation:

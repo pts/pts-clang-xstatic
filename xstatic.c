@@ -740,7 +740,7 @@ int main(int argc, char **argv) {
   argv[1] = argv[0];
   ++argv;
   --argc;
-  argp = args = malloc(sizeof(*args) * (argc + 18));
+  argp = args = malloc(sizeof(*args) * (argc + 20));
   *argp++ = prog;  /* Set destination argv[0]. */
   if (!argv[1] || (!argv[2] && 0 == strcmp(argv[1], "-v"))) {
     /* Don't add any flags, because the user wants some version info, and with
@@ -808,6 +808,9 @@ int main(int argc, char **argv) {
            */
           *argp++ = "-isystem";
           *argp++ = strdupcat(dirup, "/uclibcusr/c++include", "");
+          /* Regular g++ libstdc++ has non-backward and then backward. */
+          *argp++ = "-isystem";
+          *argp++ = strdupcat(dirup, "/uclibcusr/c++include/backward", "");
         }
       }
       if (!has_nostdinc) {
