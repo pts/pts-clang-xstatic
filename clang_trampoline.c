@@ -264,6 +264,8 @@ static void check_xflags(char **argv) {
         0 == strcmp(arg, "-m64") ||
         0 == strcmp(arg, "-sysld") ||
         0 == strcmp(arg, "--sysld") ||
+        0 == strcmp(arg, "-p") ||  /* Needs Mcrt1.o (| gcrt1.o), clang crt1.o */
+        0 == strcmp(arg, "-pg") ||  /* Needs gcrt1.o, clang uses crt1.o */
         0 == strcmp(arg, "-pie") ||
         0 == strcmp(arg, "-fpic") ||
         0 == strcmp(arg, "-fPIC") ||
