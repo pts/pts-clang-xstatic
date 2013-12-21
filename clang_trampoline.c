@@ -412,7 +412,7 @@ static void detect_lang(const char *prog, char **argv, lang_t *lang) {
  * has instructed the linker to look for the *crt*.o files a system-default
  * (e.g. /usr/lib/...) directory.
  */
-static void check_ld_crtoarg(char **argv) {
+static void check_ld_crtoarg(char **argv, char is_xstatic) {
   /* If a relevant *crt*.o file is missing in xstaticcld or xstaticfld, then
    * gcc generates e.g.
    * /usr/lib/gcc/x86_64-linux-gnu/4.6/../../../i386-linux-gnu/crtn.o , and
@@ -437,11 +437,11 @@ static void check_ld_crtoarg(char **argv) {
     if (basename[0] == '\0' || argend - arg < 2 ||
         argend[-1] != 'o' || argend[-2] != '.' ||
         ((0 != strncmp(basename, "crt", 3) ||
-          (0 != strcmp(basename, "crt0.o") &&
-           0 != strcmp(basename, "crt1.o") &&
-           0 != strcmp(basename, "crt2.o") &&
-           0 != strcmp(basename, "crti.o") &&
-           0 != strcmp(basename, "crtn.o") &&
+          ((!is_xstatic || 0 != strcmp(basename, "crt0.o")) &&
+           (!is_xstatic || 0 != strcmp(basename, "crt1.o")) &&
+           (!is_xstatic || 0 != strcmp(basename, "crt2.o")) &&
+           (!is_xstatic || 0 != strcmp(basename, "crti.o")) &&
+           (!is_xstatic || 0 != strcmp(basename, "crtn.o")) &&
            0 != strcmp(basename, "crtbegin.o") &&
            0 != strcmp(basename, "crtbeginS.o") &&
            0 != strcmp(basename, "crtbeginT.o") &&
@@ -518,7 +518,6 @@ int main(int argc, char **argv) {
      * --build-id (because not supported by old ld)
      * -z relro (because it increases the binary size and it's useless for static)
      */
-    check_ld_crtoarg(argv);
     argp = args = malloc(sizeof(*args) * (argc + 5));
     *argp++ = argv0 = *argv;
     ldmode = LM_XSTATIC;
@@ -529,6 +528,7 @@ int main(int argc, char **argv) {
         is_verbose = 1;
       }
     }
+    check_ld_crtoarg(argv, ldmode == LM_XSTATIC);
     if (ldmode == LM_XCLANGLD) {
       for (argi = argv + 1; (arg = *argi); ++argi) {
         if (0 != strcmp(arg, "--do-xclangld") &&
