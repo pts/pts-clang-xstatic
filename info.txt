@@ -64,6 +64,9 @@ TODOs for the current release:
 * TODO(pts): Create .7z for old and new uclibc libstdc++.
 * TODO(pts): Get rid of remaining ../ components in the generated ld
              command-line, caused by readlink.
+* TODO(pts): Get rid of remaining ../ components in the generated ld
+             command-line, caused by dirup + ../xstaticcld and +
+             ../uclibcusr/lib.
 * TODO(pts): Add rtti test.
 * TODO(pts): Should we include `backward'?
     Ubuntu Lucid 32-bit:
