@@ -63,7 +63,7 @@ static char *readlink_alloc(const char *path) {
   }
 }
 
-/** Resolve symlinks until a non-symlink is found. */
+/* Resolve symlinks until a non-symlink is found. */
 static char *readlink_alloc_all(const char *path) {
   char *path2, *path1 = strdup(path);
   while ((path2 = readlink_alloc(path1))) {
@@ -150,7 +150,7 @@ static archbit_t get_archbit_override(archbit_t archbit_detected) {
 }
 #endif
 
-/** Return a newly malloc()ed string containing prefix + escaped(argv) +
+/* Return a newly malloc()ed string containing prefix + escaped(argv) +
  * suffix, the caller takes ownership.
  */
 static char *escape_argv(const char *prefix, char **argv, char *suffix) {
@@ -200,7 +200,7 @@ static char *escape_argv(const char *prefix, char **argv, char *suffix) {
   return out;
 }
 
-/** Return true iff we've received a linker command-line. */
+/* Return true iff we've received a linker command-line. */
 static char detect_linker(char **argv) {
   char **argi, *arg;
   for (argi = argv + 1; (arg = *argi) &&
@@ -258,6 +258,11 @@ static void check_xflags(char **argv) {
         0 == strcmp(arg, "-m64") ||
         0 == strcmp(arg, "-sysld") ||
         0 == strcmp(arg, "--sysld") ||
+        0 == strcmp(arg, "-pie") ||
+        0 == strcmp(arg, "-fpic") ||
+        0 == strcmp(arg, "-fPIC") ||
+        0 == strcmp(arg, "-fpie") ||
+        0 == strcmp(arg, "-fPIE") ||  /* This would link Scrt1.o etc. */
         0 == strcmp(arg, "-shared") ||
         0 == strcmp(arg, "-shared-libgcc")) {
       fdprint(2, strdupcat(
@@ -295,7 +300,7 @@ static void detect_nostdinc(char **argv,
   }
 }
 
-/** Return NULL if not found. Return cmd if it contains a slash. */
+/* Return NULL if not found. Return cmd if it contains a slash. */
 static char *find_on_path(const char *cmd) {
   const char *path;
   char *pathname;
@@ -392,6 +397,68 @@ static void detect_lang(const char *prog, char **argv, lang_t *lang) {
   }
 }
 
+/* Check that the linker is not instructed to link *crt*.o files from the
+ * wrong directory. Most of the time this is a configuration issue, e.g. the
+ * wrong value for the -B compiler flag was specified, and now the compiler
+ * has instructed the linker to look for the *crt*.o files a system-default
+ * (e.g. /usr/lib/...) directory.
+ */
+static void check_ld_crtoarg(char **argv) {
+  /* If a relevant *crt*.o file is missing in xstaticcld or xstaticfld, then
+   * gcc generates e.g.
+   * /usr/lib/gcc/x86_64-linux-gnu/4.6/../../../i386-linux-gnu/crtn.o , and
+   * pts-static-clang generates crtn.o . We detect and fail on both.
+   */
+  char had_error = 0;
+  char **argi, *supported_dir;
+  const char *arg, *basename, *argend, *supbasename;
+  size_t supdirlen;
+  for (supbasename = argv[0] + strlen(argv[0]);
+       supbasename != argv[0] && supbasename[-1] != '/'; --supbasename) {}
+  supdirlen = supbasename - argv[0];
+  for (argi = argv + 1; (arg = *argi); ++argi) {
+    if (0 == strcmp(arg, "-o") && argi[1]) {
+      ++argi;
+      continue;
+    }
+    if (arg[0] == '-') continue;
+    argend = arg + strlen(arg);
+    for (basename = argend; basename != arg && basename[-1] != '/';
+         --basename) {}
+    if (basename[0] == '\0' || argend - arg < 2 ||
+        argend[-1] != 'o' || argend[-2] != '.' ||
+        ((0 != strncmp(basename, "crt", 3) ||
+          (0 != strcmp(basename, "crt0.o") &&
+           0 != strcmp(basename, "crt1.o") &&
+           0 != strcmp(basename, "crt2.o") &&
+           0 != strcmp(basename, "crti.o") &&
+           0 != strcmp(basename, "crtn.o") &&
+           0 != strcmp(basename, "crtbegin.o") &&
+           0 != strcmp(basename, "crtbeginS.o") &&
+           0 != strcmp(basename, "crtbeginT.o") &&
+           0 != strcmp(basename, "crtend.o") &&
+           0 != strcmp(basename, "crtendS.o") &&
+           0 != strcmp(basename, "crtfastmath.o"))) &&
+         (0 != strcmp(basename + 1, "crt1.o") ||
+          (0 != strcmp(basename, "Scrt1.o") &&
+           0 != strcmp(basename, "Mcrt1.o") &&
+           0 != strcmp(basename, "gcrt1.o"))))) continue;
+    if (0 == strncmp(arg, argv[0], supdirlen)) continue;
+    if (supdirlen == 0) {
+      supported_dir = ".";
+    } else {
+      supported_dir = malloc(supdirlen);
+      memcpy(supported_dir, argv[0], supdirlen - 1);
+      supported_dir[supdirlen - 1] = '\0';
+    }
+    fdprint(2, strdupcat(
+        "xstatic-ld: error: *crt*.o file linked from unsupported location "
+        "(supported is ", strdupcat(supported_dir, "): ", arg), "\n"));
+    had_error = 1;
+  }
+  if (had_error) exit(122);
+}
+
 typedef enum ldmode_t {
   LM_XCLANGLD = 0,  /* Use the ld and -lgcc shipped with clang. */
   LM_XSYSLD = 1,
@@ -438,6 +505,7 @@ int main(int argc, char **argv) {
      * --build-id (because not supported by old ld)
      * -z relro (because it increases the binary size and it's useless for static)
      */
+    check_ld_crtoarg(argv);
     argp = args = malloc(sizeof(*args) * (argc + 5));
     *argp++ = *argv;
     for (argi = argv + 1; (arg = *argi); ++argi) {
