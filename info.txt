@@ -59,7 +59,6 @@ Developer info:
 TODOs for the current release:
 
 * TODO(pts): Add constructor tests.
-* TODO(pts): Move our synthetic `ld -L...' flags as late as possible.
 * TODO(pts): Remove automatic linking of: libstdc++usjlj.a , integrate to
              old libstdc++.a?
 * TODO(pts): Create .7z for old and new uclibc libstdc++.

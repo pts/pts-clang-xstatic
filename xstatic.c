@@ -498,6 +498,7 @@ int main(int argc, char **argv) {
 
   if (detect_linker(argv)) {  /* clang trampoline runs as as ld. */
     char is_static = 0;
+    char **argli;  /* Where to add the -L flags. */
 
     /* All we do is exec()ing ld.bin with the following dropped from argv:
      *
@@ -523,28 +524,57 @@ int main(int argc, char **argv) {
     }
 
     *argp++ = "-nostdlib";  /* No system directories to find .a files. */
-    /* We put xstaticcld with
-     libgcc.a first, because clang puts
-     * /usr/lib/gcc/i486-linux-gnu/4.4 with libgcc.a before /usr/lib with
-     * libc.a .
+    /* Find argli: in front of the last -L (which will be removed), but no
+     * later than just before the first -l.
      */
-    *argp++ = strdupcat("-L", dirup, "/xstaticcld");
-    *argp++ = strdupcat("-L", dirup, "/uclibcusr/lib");
+    argli = NULL;
     for (argi = argv + 1; (arg = *argi); ++argi) {
+      if (arg[0] == '-') {
+        if (arg[1] == 'L') {  /* "-L". */
+          argli = argi;
+        } else if (arg[1] == 'l') {  /* "-l". */
+          if (!argli) argli = argi;
+          break;
+        }
+      }
+    }
+    if (!argli) argli = argv + 1;
+
+    for (argi = argv + 1; (arg = *argi); ++argi) {
+      if (argi == argli) {
+        char **argj;
+        /* Add the user-specified link dirs first (just like non-xstatic). */
+        for (argj = argv + 1; *argj; ++argj) {
+          if (0 == strncmp(*argj, "-=L", 3)) {
+            *argp++ = strdupcat("-L", "", *argj + 3);
+          }
+        }
+        /* We put xstaticcld with
+         libgcc.a first, because clang puts
+         * /usr/lib/gcc/i486-linux-gnu/4.4 with libgcc.a before /usr/lib with
+         * libc.a .
+         */
+        *argp++ = strdupcat("-L", dirup, "/xstaticcld");
+        *argp++ = strdupcat("-L", dirup, "/uclibcusr/lib");
+        argli = NULL;  /* Don't insert the -L flags again. */
+      }
       if (0 == strcmp(arg, "-z") &&
           argi[1] && 0 == strcmp(argi[1], "relro")) {
         /* Would increase size. */
-        ++argi;  /* Skip and drop both arguments: -z relro */
+        ++argi;  /* Omit both arguments: -z relro */
+      } else if (arg[0] == '-' && arg[1] == 'L') {  /* "-L". */
+        if (arg[2] == '\0' && argi[1]) ++argi;
+        /* Omit -L... containing the system link dirs, the user-specified link
+         * dir flags were passed as -=L...
+         */
+      } else if (0 == strncmp(arg, "-=L", 3)) {
+        /* Omit -=L here, gets added at position argli. */
       } else if (
           0 == strcmp(arg, "-nostdlib") ||
           0 == strcmp(arg, "--do-xstaticcld") ||
           0 == strcmp(arg, "--do-xstaticldv") ||
           0 == strncmp(arg, "--hash-style=", 13) ||  /* Would increase size. */
           0 == strcmp(arg, "--build-id") ||
-          /* -L/usr/local/lib is not emitted by clang 3.3; we play safe. */
-          is_dirprefix(arg, "-L/usr/local/lib") ||
-          is_dirprefix(arg, "-L/usr/lib") ||
-          is_dirprefix(arg, "-L/lib") ||
           0 == strncmp(arg, "--sysroot=", 10)) {
         /* Omit this argument. */
       } else if (0 == strcmp(arg, "-lstdc++")) {
@@ -691,6 +721,15 @@ int main(int argc, char **argv) {
                  0 == strcmp(arg, "-nostdinc") ||
                  0 == strcmp(arg, "-nostdinc++") ||
                  0 == strcmp(arg, "-m32")) {
+      } else if (arg[0] == '-' && arg[1] == 'L') {  /* "-L". */
+        /* Convert -L to -=L in the linker command-line on which our ld wrapper
+         * code can trigger.
+         */
+        if (arg[2] == '\0' && argi[1]) {
+          *argp++ = strdupcat("-Wl,-=L", "", *++argi);
+        } else {
+          *argp++ = strdupcat("-Wl,-=L", "", arg + 2);
+        }
       } else {
         *argp++ = arg;
       }
