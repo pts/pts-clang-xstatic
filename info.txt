@@ -52,16 +52,19 @@ Developer info:
 * clang always opens /etc/lsb-release, it's hardwired to DetectDistro,
   impossible to get rid of.
 
-TODOs:
+TODOs for the current release:
 
-* TODO(pts): Use the linker in TCC as the mini linker.
-* TODO(pts): Instead of ar and ranlib, build
-  tcc-0.9.26/win32/tools/tiny_libmaker.c, make it able to use 32-bit and
-  64-bit .o files. It also includes ranlib.
-* TODO(pts): Use TCC for C compilation speed comparisons.
+* TODO(pts): Add constructor tests.
+* TODO(pts): Move our synthetic `ld -L...' flags as late as possible.
+* TODO(pts): Remove automatic linking of: libstdc++usjlj.a , integrate to
+             old libstdc++.a?
+* TODO(pts): Detect wrong crt1.o (e.g. in /usr/lib/i386-linux-gnu etc.) in
+*            the xstatic-ld and clang-ld wrapper command-lines.
+* TODO(pts): Create .7z for old and new uclibc libstdc++.
+* TODO(pts): Get rid of remaining ../ components in the generated ld
+             command-line, caused by readlink.
 * TODO(pts): Add rtti test.
 * TODO(pts): Add automatic running of tests. (Shell script.)
-* TODO(pts): Document how libstdc++ was compiled.
 * TODO(pts): Should we include `backward'?
     Ubuntu Lucid 32-bit:
      /usr/include/c++/4.4
@@ -75,27 +78,35 @@ TODOs:
      /usr/include/c++/4.6
      /usr/include/c++/4.6/x86_64-linux-gnu/32
      /usr/include/c++/4.6/backward
-* TODO(pts): Add --oldcxx flag for 4.1 (which would use an old libstdc++). Does
-             it work in 4.0?
+* TODO(pts): Create downloads, remove backup files.
+
+TODOs for documentation:
+
+* TODO(pts): Write README.txt for all 3 projects.
+* TODO(pts): Use TCC for C compilation speed comparisons.
+* TODO(pts): Document how libstdc++ was compiled.
+* TODO(pts): Create libstdc++ .patch.
 * TODO(pts): Document minimum g++ version: 4.2. 4.1 gives too many errors.
              Does gcc-4.1 work? yes.
-* TODO(pts): Create libstdc++ .patch, and remove *~ backup files.
-* TODO(pts): Remove automatic linking of: libstdc++usjlj.a , integrate to
-             old libstdc++.a?
-* TODO(pts): Create .7z for old and new uclibc libstdc++.
-* TODO(pts): Move our synthetic `ld -L...' flags as late as possible.
-* TODO(pts): Get rid of remaining ../ components in the generated ld
-             command-line, caused by readlink.
-* TODO(pts): Get rid of redundancy between xstatic.c and clang_trampoline.c.
-* TODO(pts): Autodetect 3.3 in the clang cur symlink.
-* TODO(pts): Recompile or relink Clang 3.3 statically.
-* TODO(pts): Does LM_CLANGLD need -lgcc? Which symbols?
-* TODO(pts): Why is include_many.cc 160 bytes larger without -xsysld?
-* TODO(pts): Write README.txt for all 3 projects.
-* TODO(pts): Upgrade the pts-clang-xstatic linker? It seems to work fine.
 * TODO(pts): Document new conditions in usr/include/bits/cpp_type_traits.h,
 *            usr/include/bits/builtin_type_traits.h,
 *            and usr/include/limits and other libstdc++ changes.
-* TODO(pts): Test non-xstatic exception handling in many g++ and Clang versions.
-* TODO(pts): Detect wrong crt1.o (e.g. in /usr/lib/i386-linux-gnu etc.) in
-*            the ld command-line.
+
+TODOs for new features:
+
+* TODO(pts): Add TCC compiler.
+* TODO(pts): Use the linker in TCC as the mini linker.
+* TODO(pts): Instead of ar and ranlib, build
+  tcc-0.9.26/win32/tools/tiny_libmaker.c, make it able to use 32-bit and
+  64-bit .o files. It also includes ranlib.
+* TODO(pts): Add --oldcxx flag for 4.1 (which would use an old libstdc++). Does
+             it work in 4.0?
+* TODO(pts): Get rid of redundancy between xstatic.c and clang_trampoline.c.
+* TODO(pts): Make multiple clang-... version coexist in bin and clanginclude.
+* TODO(pts): Recompile or relink Clang 3.3 statically.
+* TODO(pts): Does LM_CLANGLD need -lgcc? Which symbols?
+* TODO(pts): Why is include_many.cc 160 bytes larger without -xsysld?
+* TODO(pts): Upgrade the pts-clang-xstatic linker? It seems to work fine.
+             What about linking speed?
+
+__EOF__
