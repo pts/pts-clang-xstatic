@@ -55,6 +55,9 @@ Developer info:
   General linking order:
   crt1.o crti.o crtbegin.o [-L paths] [user objects] [gcc libs] [C libs] [gcc libs] crtend.o crtn.o
   More references: http://gcc.gnu.org/onlinedocs/gccint/Initialization.html
+* The shipped libstdc++ (and uclibcusr/c++include) is from GCC 4.4 (g++-4.4)
+  so some newer C++0x or C++11 features may not be supported (see
+  http://gcc.gnu.org/projects/cxx0x.html).
 
 TODOs for the current release:
 
