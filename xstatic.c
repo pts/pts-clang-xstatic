@@ -697,7 +697,7 @@ int main(int argc, char **argv) {
     return 120;
   }
 
-  if (!argv[1] || 0 == strcmp(argv[0], "--help")) {
+  if (!argv[1] || 0 == strcmp(argv[1], "--help")) {
     fdprint(1, strdupcat(
         "Usage: ", argv[0], " <gcc|g++|clang|clang++> [<compiler-arg>...]\n"
         "Invokes the C/C++ compiler with -static against the xstatic uClibc.\n"
