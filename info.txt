@@ -79,7 +79,6 @@ TODOs for documentation:
 
 * TODO(pts): Is LTO (link-time-optimization) enabled in gold by default? If
              not, how to enable it?
-* TODO(pts): Document that -pg is not supported (would need gcrt1.so).
 * TODO(pts): Write README.txt for all 3 projects.
 * TODO(pts): Use TCC for C compilation speed comparisons.
 * TODO(pts): Document how libstdc++ was compiled.
@@ -93,7 +92,8 @@ TODOs for documentation:
 TODOs for new features:
 
 * TODO(pts): Add TCC compiler.
-* TODO(pts): Use the linker in TCC as the mini linker. Run constructor tests.
+* TODO(pts): Use the linker in TCC as the mini linker. Constructors seem to
+  be fine.
   It works, but the resulting C++ binaries are too large (hello.o linked
   becomes 1173252 bytes instead of 817206 bytes a.out, and `strip a.out'
   fails with `Bad value'), otherwise the program works.
