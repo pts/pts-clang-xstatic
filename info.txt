@@ -77,6 +77,8 @@ TODOs for the current release:
 
 TODOs for documentation:
 
+* TODO(pts): Is LTO (link-time-optimization) enabled in gold by default? If
+             not, how to enable it?
 * TODO(pts): Document that -pg is not supported (would need gcrt1.so).
 * TODO(pts): Write README.txt for all 3 projects.
 * TODO(pts): Use TCC for C compilation speed comparisons.
@@ -92,6 +94,9 @@ TODOs for new features:
 
 * TODO(pts): Add TCC compiler.
 * TODO(pts): Use the linker in TCC as the mini linker. Run constructor tests.
+  It works, but the resulting C++ binaries are too large (hello.o linked
+  becomes 1173252 bytes instead of 817206 bytes a.out, and `strip a.out'
+  fails with `Bad value'), otherwise the program works.
 * TODO(pts): Instead of ar and ranlib, build
   tcc-0.9.26/win32/tools/tiny_libmaker.c, make it able to use 32-bit and
   64-bit .o files. It also includes ranlib.
