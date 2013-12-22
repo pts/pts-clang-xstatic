@@ -682,12 +682,6 @@ int main(int argc, char **argv) {
           0 == strcmp(arg, "--build-id") ||
           0 == strncmp(arg, "--sysroot=", 10)) {
         /* Omit this argument. */
-      } else if (0 == strcmp(arg, "-lstdc++")) {
-        /* Fixup for linker errors: undefined reference to
-         *`_Unwind_SjLj_Unregister'.
-         */
-        *argp++ = arg;
-        *argp++ = "-lstdc++usjlj";  /* The order is important. */
       } else {
         *argp++ = *argi;
       }
