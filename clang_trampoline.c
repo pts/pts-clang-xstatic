@@ -759,7 +759,14 @@ int main(int argc, char **argv) {
   } else {
     ldmode = LM_XCLANGLD;
   }
-  if (!argv[1] || (!argv[2] && 0 == strcmp(argv[1], "-v"))) {
+  if (!argv[1] ||
+      (!argv[2] && 0 == strcmp(argv[1], "-v")) ||
+      (!argv[2] && 0 == strcmp(argv[1], "-m32")) ||
+      (0 == strcmp(argv[1], "-m32") && argv[2] && 0 == strcmp(argv[2], "-v") &&
+       !argv[3])) {
+    char is_v = 0 == strcmp(argv[1], "-v") ||
+        (argv[2] && 0 == strcmp(argv[2], "-v"));
+    if (!argv[1] || 0 != strcmp(argv[1], "-m32")) *argp++ = "-m32";
     /* Don't add any flags, because the user wants some version info, and with
      * `-Wl,... -v' gcc and clang won't display version info.
      */
@@ -775,7 +782,7 @@ int main(int argc, char **argv) {
           exit(WIFEXITED(status) ? WEXITSTATUS(status) : 124);
         }
         /* Print at the end of the output, after exec. */
-        fdprint(1, "Additinal flags supported: -xstatic -xsysld\n");
+        fdprint(is_v ? 2 : 1, "Additinal flags supported: -xstatic -xsysld\n");
         exit(0);
       }
     }

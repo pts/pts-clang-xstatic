@@ -91,6 +91,7 @@ TODOs for documentation:
 
 TODOs for new features:
 
+* TODO(pts): Run test with gcc-4.8.
 * TODO(pts): Add TCC compiler.
 * TODO(pts): Use the linker in TCC as the mini linker. Constructors seem to
   be fine.
