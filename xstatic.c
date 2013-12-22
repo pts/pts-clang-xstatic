@@ -705,7 +705,7 @@ int main(int argc, char **argv) {
     return 1;
   }
   if (argv[1][0] == '-') {
-    fdprint(2, "xstatic: error: please specify gcc prog in 1st arg\n");
+    fdprint(2, "xstatic: error: please specify gcc|clang prog in 1st arg\n");
     return 1;
   }
   check_bflags(argv);
