@@ -3,7 +3,6 @@
 # mkclangbin: build clang.bin with Ermine
 # by pts@fazekas.hu at Thu Dec 26 14:39:12 CET 2013
 #
-# Warning: uses the system's /lib/ld-linux.so.2 because of an Ermine glitch.
 # TODO(pts): Test this script on a 64-bit Linux.
 
 if test $# != 2 && test $# != 1; then
@@ -46,15 +45,15 @@ rm -f "$OUT.tmp1"
 patchelf --set-rpath '' "$OUT.tmp1"
 #patchelf --set-interpreter /lib/ld-linux.so.2 "$OUT.tmp1"
 #patchelf  --set-interpreter destlib/interpretr "$OUT.tmp1"
+INTERP="/tmp/i$$"  # Ermine needs absolute path. We use short path for patchelf.
+patchelf --set-interpreter "$INTERP" "$OUT.tmp1"
+cp -a inlib/ld-linux.so.2 "$INTERP"
 chmod +x "$OUT.tmp1"
 rm -rf destlib
 mkdir destlib
-cp -a inlib/ld-linux.so.2 destlib/interpretr
 mklibs -D -L inlib -d destlib --ldlib inlib/ld-linux.so.2 clang.bin.tmp1
-#patchelf  --set-interpreter inlib/ld-linux.so.2 "$OUT.tmp1"
-# SUXX: ErmineLight.i386 doesn't embed the custom ELF interpreter
-# (as we've set --set-interpreter), so the following doesn't work if
-# /lib/ld-linux.so.2 is bad.
+# If the --set-interpereter value was not an absolute path, Ermine wouldn't
+# embed it.
 ErmineLight.i386 -l destlib -o "$OUT".tmp2 "$OUT".tmp1
 # To get argv[0] right. Otherwise Clang reads it from /proc/self/exe.
 <"$OUT.tmp2" >"$OUT" perl -0777 \
