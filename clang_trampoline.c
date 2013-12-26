@@ -184,10 +184,6 @@ static char *readlink_alloc_all(const char *path) {
   return path1;
 }
 
-static char *path_join(char *a, char *b) {
-  return !a ? b : (b[0] == '/') ? strdupcat("", "", b) : strdupcat(a, "/", b);
-}
-
 typedef enum archbit_t {
   ARCHBIT_UNKNOWN = -1,
   ARCHBIT_UNSPECIFIED = -2,
@@ -445,6 +441,7 @@ static char *find_on_path(const char *cmd) {
 
 typedef struct lang_t {
   char is_cxx;
+  char is_cxx_prog;
   char is_clang;
   char is_compiling;
 } lang_t;
@@ -456,7 +453,7 @@ static void detect_lang(const char *prog, char **argv, lang_t *lang) {
   arg = prog;
   for (basename = arg + strlen(arg); basename != arg && basename[-1] != '/';
        --basename) {}
-  lang->is_cxx = strstr(basename, "++") != NULL;
+  lang->is_cxx = lang->is_cxx_prog = strstr(basename, "++") != NULL;
   lang->is_clang = strstr(basename, "clang") != NULL;
   for (argi = argv + 1; (arg = *argi); ++argi) {
     if (0 == strcmp(arg, "-xc++")) {
@@ -572,6 +569,30 @@ static void check_ld_crtoarg(char **argv, char is_xstatic) {
   if (had_error) exit(122);
 }
 
+/* Returns a newly malloced string containing the directory 1 level above
+ * the specified directory.
+ */
+static char *get_up_dir_alloc(const char *dir) {
+  char *dirup = NULL, *p;
+  if (0 == strcmp(dir, "..") || (dirup = readlink_alloc(dir))) {
+    free(dirup);
+    return strdupcat(dir, "/..", "");
+  }
+  dirup = strdupcat(dir, ".", "");
+  for (p = dirup + strlen(dirup) - 1; p != dirup && p[-1] != '/'; --p) {}
+  if (p == dirup) {
+    *p++ = '.';
+    if (0 == strcmp(dir, ".")) *p++ = '.';
+    *p = '\0';
+  } else if (dirup[0] == '/' && dirup[1] == '\0') {
+    fdprint(2, strdupcat("error: no parent dir for: ", dir, "\n"));
+    exit(122);
+  } else {
+    p[-1] = '\0';  /* Remove basename of dirup. */
+  }
+  return dirup;
+}
+
 typedef enum ldmode_t {
   LM_XCLANGLD = 0,  /* Use the ld and -lgcc shipped with clang. */
   LM_XSYSLD = 1,
@@ -579,11 +600,10 @@ typedef enum ldmode_t {
 } ldmode_t;
 
 int main(int argc, char **argv) {
-  char *prog, *ldso0, *argv0;
+  char *prog, *argv0;
   char *dir, *dirup;
   char *p;
   char **args, **argp;
-  const char *febemsg = "frontend";  /* Or "backend". */
   char is_verbose = 0;
   ldmode_t ldmode;
   char **argi, *arg;
@@ -591,7 +611,7 @@ int main(int argc, char **argv) {
 
   dir = find_on_path(argv[0]);
   if (!dir) {
-    fdprint(2, "xstatic: error: could not find myself on $PATH\n");
+    fdprint(2, "error: could not find myself on $PATH\n");
     return 122;
   }
   dir = readlink_alloc_all(dir);
@@ -599,17 +619,10 @@ int main(int argc, char **argv) {
   if (p == dir) {
     strcpy(dir, ".");
   } else {
-    p[-1] = '\0';
+    for (; p != dir && p[-1] == '/'; --p) {}
+    p[p == dir] = '\0';  /* Remove basename of dir. */
   }
-  /* TODO(pts): If dir is a symlink, just add ../ */
-  dirup = strdupcat(dir, "", "");
-  for (p = dirup + strlen(dirup); p != dirup && p[-1] != '/'; --p) {}
-  if (p == dirup || (dirup[0] == '/' && dirup[1] == '\0')) {
-    fdprint(2, strdupcat("xstatic: error: no parent dir for: ", dir, "\n"));
-    return 122;
-  }
-  p[-1] = '\0';  /* Remove basename of dirup. */
-
+  dirup = get_up_dir_alloc(dir);
   if (detect_linker(argv)) {  /* clang trampoline runs as as ld. */
     /* Please note that we are only invoked for `clang -xstatic', because
      * without -xstatic, the ld symlink is outside of the clang program search
@@ -716,31 +729,15 @@ int main(int argc, char **argv) {
     return 120;
   }
 
-  /* RPATH=$ORIGIN/../binlib (set manually in clang.bin) takes care. */
-  /* in clang.bin /proc/self/exE was modified to /proc/self/exe */
-  /* LD0LIBRARY_PATH is needed so ld0.so doesn't consult /etc/ld.so.cache.
-   * Please note that /lib/ld-linux.so.2 consults LD_LIBRARY_PATH, which ld0.so
-   * ignores and vice versa. This is good so we can support dynamically linked
-   * host-specific tools.
-   */
-  putenv("LD0LIBRARY_PATH=/dev/null/missing");
   /* clang was doing:
    * readlink("/proc/self/exe", ".../clang/binlib/ld-linux.so.2", ...)
    * ... and believed it's ld-linux.so.2. I edited the binary to /proc/self/exE
    * to fix it.
    */
+  argv0 = argv[0];
   argp = args = malloc(sizeof(*args) * (argc + 20));
-  *argp++ = argv0 = argv[0];  /* No effect, will be ignored. */
   /* TODO(pts): Make clang.bin configurable. */
   *argp++ = prog = strdupcat(dir, "/clang.bin", "");
-  if (argv[0][0] == '/') {
-    *argp++ = argv[0];  /* ld0.so will put it to clang.bin's argv[0]. */
-  } else {
-    /* Clang 3.3 can't find itself (for with -cc1) unless its argv[0] is an
-     * absolute pathname. So we make it absolute.
-     */
-    *argp++ = path_join(get_current_dir_name(), argv[0]);
-  }
   for (argi = argv + 1; (arg = *argi) && 0 != strcmp(arg, "-v"); ++argi) {}
   if (*argi) is_verbose = 1;
   /* It's important that -xstatic doesn't trigger when argv[1] is "-cc1",
@@ -764,7 +761,7 @@ int main(int argc, char **argv) {
       (!argv[2] && 0 == strcmp(argv[1], "-m32")) ||
       (0 == strcmp(argv[1], "-m32") && argv[2] && 0 == strcmp(argv[2], "-v") &&
        !argv[3])) {
-    char is_v = 0 == strcmp(argv[1], "-v") ||
+    char is_v = !argv[1] || 0 == strcmp(argv[1], "-v") ||
         (argv[2] && 0 == strcmp(argv[2], "-v"));
     if (!argv[1] || 0 != strcmp(argv[1], "-m32")) *argp++ = "-m32";
     /* Don't add any flags, because the user wants some version info, and with
@@ -796,7 +793,8 @@ int main(int argc, char **argv) {
     check_xflags(argv);
     need_linker = detect_need_linker(argv);
     detect_nostdinc(argv, &has_nostdinc, &has_nostdincxx);
-    detect_lang(argv[0], argv, &lang);
+    detect_lang(argv0, argv, &lang);
+    if (lang.is_cxx_prog) *argp++ = "-ccc-cxx";
 
     /* When adding more arguments here, increase the args malloc count. */
     /* We don't need get_autodetect_archflag(argv), we always send "-m32". */
@@ -811,7 +809,7 @@ int main(int argc, char **argv) {
        */
       *argp++ = "-fno-stack-protector";
       *argp++ = "-nostdinc";
-      *argp++ = "-nostdinc++";
+      if (lang.is_cxx) *argp++ = "-nostdinc++";
       if (lang.is_cxx && !has_nostdincxx) {
         /* It's important not to use the Clang flag -cxx-isystem here, because
          * that adds C++ includes after C includes, but we need the other way
@@ -890,17 +888,20 @@ int main(int argc, char **argv) {
     *argp++ = NULL;
     argc = 0;
   } else if (argv[1] && 0 == strcmp(argv[1], "-cc1")) {
-    febemsg = "backend";
+    /* The Ermine binary wouldn't work anyway, because it opens its argv[0]. */
+    fdprint(2, "error: clang: unexpected backend (-cc1) invocation\n");
+    return 125;
   } else {
     char need_linker;
     archbit_t archbit, archbit_override;
     lang_t lang;
     if (check_bflags(argv, ldmode == LM_XCLANGLD)) ldmode = LM_XSYSLD;
     need_linker = detect_need_linker(argv);
-    detect_lang(argv[0], argv, &lang);
+    detect_lang(argv0, argv, &lang);
     detect_nostdinc(argv, &has_nostdinc, &has_nostdincxx);
     archbit = get_archbit_detected(argv);
     archbit_override = get_archbit_override(archbit);
+    if (lang.is_cxx_prog) *argp++ = "-ccc-cxx";
     if (archbit_override == ARCHBIT_32) {
       *argp++ = "-m32";
       archbit = ARCHBIT_32;
@@ -949,14 +950,10 @@ int main(int argc, char **argv) {
     }
   }
   memcpy(argp, argv + 1, argc * sizeof(*argp));
-  ldso0 = strdupcat(dirup, "/binlib/ld0.so", "");
   if (is_verbose) {
-    args[0] = ldso0;
-    fdprint(2, escape_argv(
-        strdupcat("info: running clang ", febemsg, ":\n"), args, "\n"));
+    fdprint(2, escape_argv("info: running clang frontend:\n", args, "\n"));
   }
-  args[0] = argv0;
-  execv(ldso0, args);
+  execv(prog, args);
   fdprint(2, strdupcat("error: clang: exec failed: ", prog, "\n"));
   return 120;
 }

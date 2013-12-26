@@ -185,12 +185,9 @@ static char *readlink_alloc_all(const char *path) {
   return path1;
 }
 
-#if 0
-static char *path_join(char *a, char *b) {
-  return !a ? b : (b[0] == '/') ? strdupcat("", "", b) : strdupcat(a, "/", b);
-}
-#endif
-
+/* Returns a newly malloced string containing the directory 1 level above
+ * the specified directory.
+ */
 typedef enum archbit_t {
   ARCHBIT_UNKNOWN = -1,
   ARCHBIT_UNSPECIFIED = -2,
@@ -436,6 +433,7 @@ static char *find_on_path(const char *cmd) {
 
 typedef struct lang_t {
   char is_cxx;
+  char is_cxx_prog;
   char is_clang;
   char is_compiling;
 } lang_t;
@@ -447,7 +445,7 @@ static void detect_lang(const char *prog, char **argv, lang_t *lang) {
   arg = prog;
   for (basename = arg + strlen(arg); basename != arg && basename[-1] != '/';
        --basename) {}
-  lang->is_cxx = strstr(basename, "++") != NULL;
+  lang->is_cxx = lang->is_cxx_prog = strstr(basename, "++") != NULL;
   lang->is_clang = strstr(basename, "clang") != NULL;
   for (argi = argv + 1; (arg = *argi); ++argi) {
     if (0 == strcmp(arg, "-xc++")) {
@@ -563,6 +561,27 @@ static void check_ld_crtoarg(char **argv) {
   if (had_error) exit(122);
 }
 
+static char *get_up_dir_alloc(const char *dir) {
+  char *dirup = NULL, *p;
+  if (0 == strcmp(dir, "..") || (dirup = readlink_alloc(dir))) {
+    free(dirup);
+    return strdupcat(dir, "/..", "");
+  }
+  dirup = strdupcat(dir, ".", "");
+  for (p = dirup + strlen(dirup) - 1; p != dirup && p[-1] != '/'; --p) {}
+  if (p == dirup) {
+    *p++ = '.';
+    if (0 == strcmp(dir, ".")) *p++ = '.';
+    *p = '\0';
+  } else if (dirup[0] == '/' && dirup[1] == '\0') {
+    fdprint(2, strdupcat("xstatic: error: no parent dir for: ", dir, "\n"));
+    exit(122);
+  } else {
+    p[-1] = '\0';  /* Remove basename of dirup. */
+  }
+  return dirup;
+}
+
 typedef enum ldmode_t {
   LM_XCLANGLD = 0,  /* Use the ld and -lgcc shipped with clang. */
   LM_XSYSLD = 1,
@@ -588,17 +607,10 @@ int main(int argc, char **argv) {
   if (p == dir) {
     strcpy(dir, ".");
   } else {
-    p[-1] = '\0';  /* Remove basename of dir. */
+    for (; p != dir && p[-1] == '/'; --p) {}
+    p[p == dir] = '\0';  /* Remove basename of dir. */
   }
-  /* TODO(pts): If dir is a symlink, just add ../ */
-  dirup = strdupcat(dir, "", "");
-  for (p = dirup + strlen(dirup); p != dirup && p[-1] != '/'; --p) {}
-  if (p == dirup || (dirup[0] == '/' && dirup[1] == '\0')) {
-    fdprint(2, strdupcat("xstatic: error: no parent dir for: ", dir, "\n"));
-    return 122;
-  }
-  p[-1] = '\0';  /* Remove basename of dirup. */
-
+  dirup = get_up_dir_alloc(dir);
   if (detect_linker(argv)) {  /* clang trampoline runs as as ld. */
     char is_static = 0;
     char **argli;  /* Where to add the -L flags. */
