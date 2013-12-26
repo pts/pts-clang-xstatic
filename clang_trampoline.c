@@ -25,8 +25,9 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#define _GNU_SOURCE 1  /* Needed for get_current_dir_name() */
-
+#ifdef USE_MINIINC
+#include <miniinc.h>
+#else
 #include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
@@ -35,6 +36,7 @@
 #include <sys/utsname.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#endif
 
 static char *strdupcat(const char *a, const char *b, const char *c) {
   const size_t sa = strlen(a), sb = strlen(b), sc = strlen(c);
