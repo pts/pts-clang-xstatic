@@ -66,6 +66,8 @@ Developer info:
   with most system compilers. For the g++-4.1.2 in
   cross-compiler-i686.tar.bz, you need to specify -fno-exceptions, otherwise
   you'll get an undefined symbol error for __gcc_personality_sj0.
+* a.out size is the same (817404 on both narancs and laptop)
+  for `../xstatic ../clang++ ~/prg/hello.cc'. Good.
 
 TODOs for the current release:
 
