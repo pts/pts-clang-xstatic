@@ -69,9 +69,6 @@ Developer info:
 
 TODOs for the current release:
 
-* TODO(pts): Add constructor tests.
-* TODO(pts): Add rtti test.
-* TODO(pts): Add testing framework to run all the tests.
 * TODO(pts): Create .7z for old and new uclibc libstdc++.
 * TODO(pts): Create downloads, remove backup files.
 
@@ -91,7 +88,8 @@ TODOs for documentation:
 
 TODOs for new features:
 
-* TODO(pts): Run test with gcc-4.8.
+* TODO(pts): Test include_many.cc with -std=c++0x.
+* TODO(pts): Add testing framework to run `clang -xsysld' etc. tests.
 * TODO(pts): Add TCC compiler.
 * TODO(pts): Use the linker in TCC as the mini linker. Constructors seem to
   be fine.
