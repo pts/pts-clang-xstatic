@@ -1,0 +1,64 @@
+#!/bin/sh --
+#
+# mkclangbin: build clang.bin with Ermine
+# by pts@fazekas.hu at Thu Dec 26 14:39:12 CET 2013
+#
+# Warning: uses the system's /lib/ld-linux.so.2 because of an Ermine glitch.
+# TODO(pts): Test this script on a 64-bit Linux.
+
+if test $# != 2 && test $# != 1; then
+  echo "Usage: $0 <clang-input-binary> [<clang-output-binary>]
+Example <clang-input-binary>: /tmp/clang+llvm-3.3-i386-debian6/bin/clang
+Default <clang-output-binary>: clang.bin" >&2
+  exit 1
+fi
+
+IN="$1"
+OUT="${2:-clang.bin}"
+
+set -ex
+: IN="$IN"
+: OUT="$OUT"
+type patchelf.static
+type perl
+type sha1sum
+type mklibs
+type ErmineLight.i386
+test -f inlib.sfx.7z
+test -x inlib.sfx.7z
+
+SHA1="$(sha1sum <"$IN")"
+# /tmp/clang+llvm-3.3-i386-debian6/bin/clang
+test "$SHA1" = 'a3d229822f724a883ac23a7d490056e3fa4fd2d6  -'
+
+rm -rf inlib
+./inlib.sfx.7z -y
+test -f inlib/libc.so.6
+test -f inlib/libc_pic.a
+test -f inlib/libc_pic.map
+
+rm -f "$OUT.tmp1"
+<"$IN" >"$OUT.tmp1" cat
+#<"$IN" >"$OUT.tmp1" perl -0777 \
+#    -pe'die if !s@\0/proc/self/exe\0@\0/proc/self/exE\0@'
+#patchelf --set-rpath '$ORIGIN/inlib' "$OUT.tmp1"
+#patchelf --set-rpath '$ORIGIN/destlib' "$OUT.tmp1"
+patchelf --set-rpath '' "$OUT.tmp1"
+#patchelf --set-interpreter /lib/ld-linux.so.2 "$OUT.tmp1"
+#patchelf  --set-interpreter destlib/interpretr "$OUT.tmp1"
+chmod +x "$OUT.tmp1"
+rm -rf destlib
+mkdir destlib
+cp -a inlib/ld-linux.so.2 destlib/interpretr
+mklibs -D -L inlib -d destlib --ldlib inlib/ld-linux.so.2 clang.bin.tmp1
+#patchelf  --set-interpreter inlib/ld-linux.so.2 "$OUT.tmp1"
+# SUXX: ErmineLight.i386 doesn't embed the custom ELF interpreter
+# (as we've set --set-interpreter), so the following doesn't work if
+# /lib/ld-linux.so.2 is bad.
+ErmineLight.i386 -l destlib -o "$OUT".tmp2 "$OUT".tmp1
+# To get argv[0] right. Otherwise Clang reads it from /proc/self/exe.
+<"$OUT.tmp2" >"$OUT" perl -0777 \
+    -pe'die if !s@\0/proc/self/exe\0@\0/proc/self/exE\0@'
+rm -rf inlib destlib "$OUT.tmp1" "$OUT.tmp2"
+ls -l "$OUT"
+: mkclangbin OK.
