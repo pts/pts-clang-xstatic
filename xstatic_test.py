@@ -31,15 +31,21 @@ SRCDIR = 'testsrc'
 
 def FindOnPath(prog):
   if os.sep in prog:
-    return prog
-  for dirname in os.getenv('PATH', '/bin::/usr/bin').split(os.pathsep):
-    pathname = os.path.join(dirname, prog)
-    if os.path.isfile(pathname):
-      return pathname
+    if os.path.isfile(prog):
+      return prog
+  else:
+    for dirname in os.getenv('PATH', '/bin::/usr/bin').split(os.pathsep):
+      pathname = os.path.join(dirname, prog)
+      if os.path.isfile(pathname):
+        return pathname
   return None
 
 
 XSTATIC = FindOnPath('xstatic')
+# Find the clang binary next to the xstatic binary (after following symlinks).
+#
+# Also converts clang to absolute path.
+LOCAL_CLANG = os.path.join(os.path.dirname(os.path.realpath(XSTATIC)), 'clang')
 
 
 def MaybeRemove(filename):
@@ -216,6 +222,8 @@ def AssertCompileRun(src_filename, cmd, expect_stdout,
       if expect_link_error and '.o:' in line:
         pass
       elif expect_link_error and '): undefined reference to ' in line:
+        pass
+      elif expect_link_error and '): error: undefined reference to ' in line:
         pass
       elif expect_link_error and '.o: In function ' in line:
         pass
@@ -550,6 +558,29 @@ class SysGccTest(XstaticTestBaseCases):
   CC_COMPILER = ('g++', '-m32')
 
 
+class SysClangTest(XstaticTestBaseCases):
+  EXPECT_STATIC = None
+  C_COMPILER  = ('clang',   '-m32')
+  CC_COMPILER = ('clang++', '-m32')
+
+
+class LocalClangTest(XstaticTestBaseCases):
+  EXPECT_STATIC = None
+  C_COMPILER  = (LOCAL_CLANG,        '-m32')
+  CC_COMPILER = (LOCAL_CLANG + '++', '-m32')
+
+
+class LocalClangXsysldFlagTest(XstaticTestBaseCases):
+  EXPECT_STATIC = None
+  C_COMPILER  = (LOCAL_CLANG,        '-xsysld', '-m32')
+  CC_COMPILER = (LOCAL_CLANG + '++', '-xsysld', '-m32')
+
+
+class LocalClangXstaticFlagTest(XstaticTestBaseCases):
+  C_COMPILER  = (LOCAL_CLANG,        '-xstatic')
+  CC_COMPILER = (LOCAL_CLANG + '++', '-xstatic')
+
+
 class XstaticGccTest(XstaticTestBaseCases):
   C_COMPILER  = (XSTATIC, 'gcc')
   CC_COMPILER = (XSTATIC, 'g++')
@@ -605,20 +636,9 @@ class XstaticClangTest(XstaticTestBaseCases):
   CC_COMPILER = (XSTATIC, 'clang++')
 
 
-class XstaticClangLocalTest(XstaticTestBaseCases):
-  xstatic = FindOnPath(XSTATIC)
-  if xstatic:
-    # Find the clang binary next to the xstatic binary (after following
-    # symlinks).
-    #
-    # Also converts clang to absolute path.
-    clang = os.path.join(os.path.dirname(os.path.realpath(xstatic)), 'clang')
-    C_COMPILER  = (XSTATIC, clang)
-    CC_COMPILER = (XSTATIC, clang + '++')
-    del clang
-  else:
-    C_COMPILER = CC_COMPILER = None
-  del xstatic
+class XstaticLocalClangTest(XstaticTestBaseCases):
+  C_COMPILER  = (XSTATIC, LOCAL_CLANG)
+  CC_COMPILER = (XSTATIC, LOCAL_CLANG + '++')
 
 
 if __name__ == '__main__':
