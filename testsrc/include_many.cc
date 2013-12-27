@@ -38,7 +38,7 @@
 #include <iterator>
 #include <iosfwd>
 #include <functional>
-#include <initializer_list>
+// #include <initializer_list>  // Needs: -std=c++0x or -std=gnu++0x
 // #include <forward_list>  // Needs: -std=c++0x or -std=gnu++0x
 #include <csetjmp>
 // #include <cstdbool>  // Needs: -std=c++0x or -std=gnu++0x
