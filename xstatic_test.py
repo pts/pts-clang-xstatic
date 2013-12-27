@@ -26,7 +26,6 @@ import unittest
 
 TMPPROG = 'xstatic_test.tmp.%d.prog' % os.getpid()
 SRCDIR = 'testsrc'
-XSTATIC = 'xstatic'
 
 
 
@@ -38,6 +37,9 @@ def FindOnPath(prog):
     if os.path.isfile(pathname):
       return pathname
   return None
+
+
+XSTATIC = FindOnPath('xstatic')
 
 
 def MaybeRemove(filename):
@@ -54,18 +56,31 @@ def WriteAndRemove(filename):
   MaybeRemove(filename)
 
 
+def GetProg(compiler):
+  return compiler[compiler[0] == XSTATIC]
+
+
+def FindCompilerOnPath(compiler):
+  if compiler is None:
+    return None
+  elif compiler is ():
+    return True
+  else:
+    return FindOnPath(GetProg(compiler))
+
+
 def DelUnusedTestClasses():
   """Delete test classes whose compiler is not available."""
   g = globals()
+  g.pop('XstaticTestBaseCases')
   base = g.pop('XstaticTestBase')
   skip_count = 0
   keys_to_delete = set()
   for key, value in sorted(g.iteritems()):
     if isinstance(value, type) and issubclass(value, base):
       do_keep = False
-      if not (value.C_COMPILER and value.CC_COMPILER and
-              FindOnPath(value.C_COMPILER[0]) and
-              FindOnPath(value.CC_COMPILER[0])):
+      if not (FindCompilerOnPath(value.C_COMPILER) and
+              FindCompilerOnPath(value.CC_COMPILER)):
         print >>sys.stderr, 'info: skipping: %s' % (value.__name__)
         skip_count += 1
         keys_to_delete.add(key)
@@ -89,7 +104,7 @@ PT_DYNAMIC = 2
 PT_INTERP = 3
 
 
-def IsElf32BitLsbStaticExecutable(filename):
+def IsElf32BitLsbExecutable(filename, expect_static):
   f = open(filename)
   try:
     head = f.read(4096)
@@ -98,6 +113,9 @@ def IsElf32BitLsbStaticExecutable(filename):
   # Check ELF, 32-bit, LSB, executable.
   if head[:6] != '\177ELF\001\001' or head[16] != '\002':
     return False
+  if expect_static is None:
+    return True
+  is_static = True
   # Now we check for static linkage. For that we check that there is no
   # PT_DYNAMIC or PT_INTERP field in the program header.
   e_phoff, = struct.unpack('<L', head[28 : 32])
@@ -109,19 +127,20 @@ def IsElf32BitLsbStaticExecutable(filename):
   for i in xrange(e_phoff, phend, e_phentsize):
     p_type, = struct.unpack('<L', head[i : i + 4])
     if p_type in (PT_DYNAMIC, PT_INTERP):
-      return False  # Found a dynamically linked executable.
-  return True
+      is_static = False  # Found a dynamically linked executable.
+      break
+  return bool(expect_static) == is_static
 
 
 STDOUT_LINE_PREFIX = '//: '
 
 
-def IsOldCompiler(pre, compiler, is_clang, version):
+def IsOldCompiler(compiler, is_clang, version):
   """Return True iff compiler is clang older than version."""
   is_clang = bool(is_clang)
-  if is_clang != ('clang' in os.path.basename(compiler[0])):
+  if is_clang != ('clang' in os.path.basename(GetProg(compiler))):
     return False
-  cmd = tuple(pre) + tuple(compiler) + ('-v',)
+  cmd = tuple(compiler) + ('-v',)
   p = subprocess.Popen(cmd, stdin=subprocess.PIPE,
                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
   cmd_str = ' '.join(map(pipes.quote, cmd))
@@ -157,7 +176,8 @@ def AssertCompileRun(src_filename, cmd, expect_stdout,
                      expect_compile_warning=False,
                      expect_compile_stdout=False,
                      expect_compile_fail=None,
-                     expect_runtime_error=False):
+                     expect_runtime_error=False,
+                     expect_static=True):
   if expect_stdout is True:
     if expect_link_error or expect_compile_error or expect_compile_stdout:
       expect_stdout = ''
@@ -194,6 +214,10 @@ def AssertCompileRun(src_filename, cmd, expect_stdout,
   if stderr:
     for line in cStringIO.StringIO(stderr):
       if expect_link_error and '.o:' in line:
+        pass
+      elif expect_link_error and '): undefined reference to ' in line:
+        pass
+      elif expect_link_error and '.o: In function ' in line:
         pass
       elif (expect_link_error and
             'error: linker command failed with exit code 1' in line):
@@ -260,9 +284,9 @@ def AssertCompileRun(src_filename, cmd, expect_stdout,
     return
   assert os.path.isfile(TMPPROG), (
       'compiler did not generate binary %s: %s' % (TMPPROG, cmd_str))
-  assert IsElf32BitLsbStaticExecutable(TMPPROG), (
-      'compiler did not generate an ELF 32-bit LSB, statically linked '
-      'executable %s: %s' % (TMPPROG, cmd_str))
+  assert IsElf32BitLsbExecutable(TMPPROG, expect_static), (
+      'compiler did not generate an ELF 32-bit LSB, static=%r '
+      'executable %s: %s' % (expect_static, TMPPROG, cmd_str))
 
   if os.sep in TMPPROG:
     tmpprog_cmd = (TMPPROG,)
@@ -307,6 +331,7 @@ DEFAULT_FLAGS = ('-s', '-O2', '-W', '-Wall')
 class XstaticTestBase(unittest.TestCase):
   C_COMPILER  = None  # Must be overridden in subclasses.
   CC_COMPILER = None  # Must be overridden in subclasses.
+  EXPECT_STATIC = True
 
   def tearDown(self):
     MaybeRemove(TMPPROG)
@@ -339,10 +364,9 @@ class XstaticTestBase(unittest.TestCase):
       raise ValueError('Unknown is_cc value: %r' % is_cc)
     if src_filename is not None and os.sep not in src_filename:
       src_filename = os.path.join(SRCDIR, src_filename)
-    cmd = [XSTATIC]
-    cmd.extend(compiler)
+    cmd = list(compiler)
     if (expect_compile_error is True or expect_compile_warning) and (
-        'clang' in compiler[0]):
+        'clang' in GetProg(compiler)):
       # Clang Caret diagnostics are printed at the beginning of the line,
       # with no leading space. That can confuse our error message parser, so
       # we just disable them. GCC caret diagnostics have a leading space.
@@ -358,8 +382,11 @@ class XstaticTestBase(unittest.TestCase):
                      expect_compile_error=expect_compile_error,
                      expect_compile_warning=expect_compile_warning,
                      expect_compile_stdout=expect_compile_stdout,
-                     expect_runtime_error=expect_runtime_error)
+                     expect_runtime_error=expect_runtime_error,
+                     expect_static=self.EXPECT_STATIC)
 
+
+class XstaticTestBaseCases(XstaticTestBase):
   def testNoInputFiles(self):
     self.AssertProg(None, is_cc=False, flags=(),
                     expect_compile_error=MSG_NO_INPUT_FILES)
@@ -385,18 +412,6 @@ class XstaticTestBase(unittest.TestCase):
     self.AssertProg(None, is_cc=True, flags=('-v',),
                     expect_compile_fail=False,
                     expect_compile_error=MSG_THREAD_MODEL)
-
-  def testNoArg(self):
-    self.AssertProg(None, is_cc=(), flags=(), expect_compile_fail=True,
-                    expect_compile_stdout=MSG_XSTATIC_HELP)
-
-  def testHelpArg(self):
-    self.AssertProg(None, is_cc=(), flags=('--help',), expect_compile_fail=True,
-                    expect_compile_stdout=MSG_XSTATIC_HELP)
-
-  def testDashVArg(self):
-    self.AssertProg(None, is_cc=(), flags=('-v',),
-                    expect_compile_error=MSG_XSTATIC_ARGV1DASH)
 
   def testHellowC(self):
     self.AssertProg('hellow.c')
@@ -453,7 +468,7 @@ class XstaticTestBase(unittest.TestCase):
                     flags=DEFAULT_FLAGS + ('-fno-rtti',))
 
   def testExcCcNoRttiEarlyWarning(self):
-    if 'clang' in os.path.basename(self.CC_COMPILER[0]):
+    if 'clang' in os.path.basename(GetProg(self.CC_COMPILER)):
       expect_compile_warning = False
     else:
       expect_compile_warning = 'exception'
@@ -487,8 +502,8 @@ class XstaticTestBase(unittest.TestCase):
                     flags=DEFAULT_FLAGS + ('-fno-exceptions',))
 
   def testDyncastCcNoExcNoRtti(self):
-    if ('clang' in os.path.basename(self.CC_COMPILER[0]) or
-        IsOldCompiler((XSTATIC,), self.CC_COMPILER, False, '4.1~')):
+    if ('clang' in os.path.basename(GetProg(self.CC_COMPILER)) or
+        IsOldCompiler(self.CC_COMPILER, False, '4.1~')):
       kwargs = {'expect_runtime_error': True, 'expect_stdout': False}
     else:
       kwargs = {'expect_compile_error': True}
@@ -501,7 +516,7 @@ class XstaticTestBase(unittest.TestCase):
                     flags=DEFAULT_FLAGS + ('-fno-exceptions',))
 
   def testRttiCcNoExcNoRtti(self):
-    if IsOldCompiler((XSTATIC,), self.CC_COMPILER, True, '3.0~'):
+    if IsOldCompiler(self.CC_COMPILER, True, '3.0~'):
       # Known to work like this in clang++-3.0.
       kwargs = {'expect_runtime_error': True, 'expect_stdout': False}
     else:
@@ -512,66 +527,94 @@ class XstaticTestBase(unittest.TestCase):
                     **kwargs)
 
 
-class XstaticGcc41Test(XstaticTestBase):
-  C_COMPILER  = ('gcc-4.1',)
-  CC_COMPILER = ('g++-4.1',)
+class XstaticNoCompilerFlagsTest(XstaticTestBase):
+  C_COMPILER = CC_COMPILER = ()
+
+  def testNoArg(self):
+    self.AssertProg(None, is_cc=(XSTATIC,), flags=(), expect_compile_fail=True,
+                    expect_compile_stdout=MSG_XSTATIC_HELP)
+
+  def testHelpArg(self):
+    self.AssertProg(None, is_cc=(XSTATIC,), flags=('--help',),
+                    expect_compile_fail=True,
+                    expect_compile_stdout=MSG_XSTATIC_HELP)
+
+  def testDashVArg(self):
+    self.AssertProg(None, is_cc=(XSTATIC,), flags=('-v',),
+                    expect_compile_error=MSG_XSTATIC_ARGV1DASH)
 
 
-class XstaticGcc42Test(XstaticTestBase):
-  C_COMPILER  = ('gcc-4.2',)
-  CC_COMPILER = ('g++-4.2',)
+class SysGccTest(XstaticTestBaseCases):
+  EXPECT_STATIC = None
+  C_COMPILER  = ('gcc', '-m32')
+  CC_COMPILER = ('g++', '-m32')
 
 
-class XstaticGcc43Test(XstaticTestBase):
-  C_COMPILER  = ('gcc-4.3',)
-  CC_COMPILER = ('g++-4.3',)
+class XstaticGccTest(XstaticTestBaseCases):
+  C_COMPILER  = (XSTATIC, 'gcc')
+  CC_COMPILER = (XSTATIC, 'g++')
 
 
-class XstaticGcc44Test(XstaticTestBase):
-  C_COMPILER  = ('gcc-4.4',)
-  CC_COMPILER = ('g++-4.4',)
+class XstaticGcc41Test(XstaticTestBaseCases):
+  C_COMPILER  = (XSTATIC, 'gcc-4.1')
+  CC_COMPILER = (XSTATIC, 'g++-4.1')
 
 
-class XstaticGcc45Test(XstaticTestBase):
-  C_COMPILER  = ('gcc-4.5',)
-  CC_COMPILER = ('g++-4.5',)
+class XstaticGcc42Test(XstaticTestBaseCases):
+  C_COMPILER  = (XSTATIC, 'gcc-4.2')
+  CC_COMPILER = (XSTATIC, 'g++-4.2')
 
 
-class XstaticGcc46Test(XstaticTestBase):
-  C_COMPILER  = ('gcc-4.6',)
-  CC_COMPILER = ('g++-4.6',)
+class XstaticGcc43Test(XstaticTestBaseCases):
+  C_COMPILER  = (XSTATIC, 'gcc-4.3')
+  CC_COMPILER = (XSTATIC, 'g++-4.3')
 
 
-class XstaticGcc47Test(XstaticTestBase):
-  C_COMPILER  = ('gcc-4.7',)
-  CC_COMPILER = ('g++-4.7',)
+class XstaticGcc44Test(XstaticTestBaseCases):
+  C_COMPILER  = (XSTATIC, 'gcc-4.4')
+  CC_COMPILER = (XSTATIC, 'g++-4.4')
 
 
-class XstaticGcc48Test(XstaticTestBase):
-  C_COMPILER  = ('gcc-4.8',)
-  CC_COMPILER = ('g++-4.8',)
+class XstaticGcc45Test(XstaticTestBaseCases):
+  C_COMPILER  = (XSTATIC, 'gcc-4.5')
+  CC_COMPILER = (XSTATIC, 'g++-4.5')
 
 
-class XstaticGcc49Test(XstaticTestBase):
-  C_COMPILER  = ('gcc-4.9',)
-  CC_COMPILER = ('g++-4.9',)
+class XstaticGcc46Test(XstaticTestBaseCases):
+  C_COMPILER  = (XSTATIC, 'gcc-4.6')
+  CC_COMPILER = (XSTATIC, 'g++-4.6')
 
 
-class XstaticClangTest(XstaticTestBase):
-  C_COMPILER  = ('clang',)
-  CC_COMPILER = ('clang++',)
+class XstaticGcc47Test(XstaticTestBaseCases):
+  C_COMPILER  = (XSTATIC, 'gcc-4.7')
+  CC_COMPILER = (XSTATIC, 'g++-4.7')
 
 
-class XstaticClangLocalTest(XstaticTestBase):
-  xstatic = FindOnPath('xstatic')
+class XstaticGcc48Test(XstaticTestBaseCases):
+  C_COMPILER  = (XSTATIC, 'gcc-4.8')
+  CC_COMPILER = (XSTATIC, 'g++-4.8')
+
+
+class XstaticGcc49Test(XstaticTestBaseCases):
+  C_COMPILER  = (XSTATIC, 'gcc-4.9')
+  CC_COMPILER = (XSTATIC, 'g++-4.9')
+
+
+class XstaticClangTest(XstaticTestBaseCases):
+  C_COMPILER  = (XSTATIC, 'clang')
+  CC_COMPILER = (XSTATIC, 'clang++')
+
+
+class XstaticClangLocalTest(XstaticTestBaseCases):
+  xstatic = FindOnPath(XSTATIC)
   if xstatic:
     # Find the clang binary next to the xstatic binary (after following
     # symlinks).
     #
     # Also converts clang to absolute path.
     clang = os.path.join(os.path.dirname(os.path.realpath(xstatic)), 'clang')
-    C_COMPILER  = (clang,)
-    CC_COMPILER = (clang + '++',)
+    C_COMPILER  = (XSTATIC, clang)
+    CC_COMPILER = (XSTATIC, clang + '++')
     del clang
   else:
     C_COMPILER = CC_COMPILER = None
@@ -582,7 +625,6 @@ if __name__ == '__main__':
   hc = os.path.join(SRCDIR, 'hellow.c')
   assert os.path.isfile(hc), 'not found: %s' % hc
   del hc
-  XSTATIC = FindOnPath('xstatic')
   assert XSTATIC, 'not found on path: xstatic'
   WriteAndRemove(TMPPROG)
   skip_count = DelUnusedTestClasses()
