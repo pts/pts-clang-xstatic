@@ -76,6 +76,8 @@ TODOs for the current release:
 
 TODOs for documentation:
 
+* TODO(pts): Our local clang on Debian Jessie needs for C++ compilation:
+*            ln -snf i386-linux-gnu /usr/include/i486-linux-gnu
 * TODO(pts): Is LTO (link-time-optimization) enabled in gold by default? If
              not, how to enable it?
 * TODO(pts): Write README.txt for all 3 projects.
