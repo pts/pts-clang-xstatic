@@ -249,6 +249,8 @@ def AssertCompileRun(src_filename, cmd, expect_stdout,
         pass
       elif expect_link_error and '.o: In function ' in line:
         pass
+      elif expect_link_error and ' has invalid symbol index ' in line:
+        pass
       elif (expect_link_error and
             'error: linker command failed with exit code 1' in line):
         pass
