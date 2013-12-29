@@ -18,6 +18,7 @@ import difflib
 import os
 import os.path
 import pipes
+import platform
 import signal
 import struct
 import subprocess
@@ -46,6 +47,9 @@ XSTATIC = FindOnPath('xstatic')
 #
 # Also converts clang to absolute path.
 LOCAL_CLANG = os.path.join(os.path.dirname(os.path.realpath(XSTATIC)), 'clang')
+HAS_64BIT_HEADERS = os.path.isfile(os.path.dirname(
+    FindOnPath('gcc') or '/usr') +
+    '/../include/x86_64-linux-gnu/gnu/stubs-64.h')
 
 
 def MaybeRemove(filename):
@@ -78,20 +82,20 @@ def FindCompilerOnPath(compiler):
 def DelUnusedTestClasses():
   """Delete test classes whose compiler is not available."""
   g = globals()
-  g.pop('XstaticTestBaseCases')
-  base = g.pop('XstaticTestBase')
+  g.pop('TestBaseCases')
+  base = g.pop('TestBase')
   skip_count = 0
-  keys_to_delete = set()
-  for key, value in sorted(g.iteritems()):
+  names_to_delete = set()
+  for name, value in sorted(g.iteritems()):
     if isinstance(value, type) and issubclass(value, base):
-      do_keep = False
-      if not (FindCompilerOnPath(value.C_COMPILER) and
-              FindCompilerOnPath(value.CC_COMPILER)):
+      if ((value.EXPECT_BITS == 64 and not HAS_64BIT_HEADERS) or
+          not FindCompilerOnPath(value.C_COMPILER) or
+          not FindCompilerOnPath(value.CC_COMPILER)):
         print >>sys.stderr, 'info: skipping: %s' % (value.__name__)
         skip_count += 1
-        keys_to_delete.add(key)
-  for key in sorted(keys_to_delete):
-    del g[key]
+        names_to_delete.add(name)
+  for name in sorted(names_to_delete):
+    del g[name]
   return skip_count
 
 
@@ -110,23 +114,40 @@ PT_DYNAMIC = 2
 PT_INTERP = 3
 
 
-def IsElf32BitLsbExecutable(filename, expect_static):
+def IsElfLsb(filename, expect_static, expect_bits, expect_type):
+  if expect_bits == 32:
+    bit_str = '\001'
+  elif expect_bits == 64:
+    bit_str = '\002'
+  else:
+    raise ValueError('Unsupported expect_bits=%r' % (expect_bits,))
+  if expect_type == 'relocatable':
+    e_type_str = '\001'
+  elif expect_type == 'executable':
+    e_type_str = '\002'
+  else:
+    raise ValueError('Unsupported expect_type=%r' % (expect_type,))
   f = open(filename)
   try:
     head = f.read(4096)
   finally:
     f.close()
   # Check ELF, 32-bit, LSB, executable.
-  if head[:6] != '\177ELF\001\001' or head[16] != '\002':
+  if head[:6] != '\177ELF%s\001' % bit_str or head[16] != e_type_str:
     return False
-  if expect_static is None:
+  if expect_static is None or expect_type == 'relocatable':
     return True
   is_static = True
   # Now we check for static linkage. For that we check that there is no
   # PT_DYNAMIC or PT_INTERP field in the program header.
-  e_phoff, = struct.unpack('<L', head[28 : 32])
-  e_phentsize, e_phnum = struct.unpack('<HH', head[42 : 46])
-  assert e_phentsize == 32, 'bad ELF program header size: %d' % e_phentsize
+  if expect_bits == 64:
+    e_phoff, = struct.unpack('<Q', head[32 : 40])
+    e_phentsize, e_phnum = struct.unpack('<HH', head[54 : 58])
+    assert e_phentsize == 56, 'bad ELF program header size: %d' % e_phentsize
+  else:
+    e_phoff, = struct.unpack('<L', head[28 : 32])
+    e_phentsize, e_phnum = struct.unpack('<HH', head[42 : 46])
+    assert e_phentsize == 32, 'bad ELF program header size: %d' % e_phentsize
   assert e_phoff < len(head), 'ELF program header starts too late'
   phend = e_phoff + e_phentsize * e_phnum
   assert phend <= len(head), 'ELF program header ends too late'
@@ -183,7 +204,8 @@ def AssertCompileRun(src_filename, cmd, expect_stdout,
                      expect_compile_stdout=False,
                      expect_compile_fail=None,
                      expect_runtime_error=False,
-                     expect_static=True):
+                     expect_static=True,
+                     expect_bits=32):
   if expect_stdout is True:
     if expect_link_error or expect_compile_error or expect_compile_stdout:
       expect_stdout = ''
@@ -292,9 +314,15 @@ def AssertCompileRun(src_filename, cmd, expect_stdout,
     return
   assert os.path.isfile(TMPPROG), (
       'compiler did not generate binary %s: %s' % (TMPPROG, cmd_str))
-  assert IsElf32BitLsbExecutable(TMPPROG, expect_static), (
-      'compiler did not generate an ELF 32-bit LSB, static=%r '
-      'executable %s: %s' % (expect_static, TMPPROG, cmd_str))
+  if '-c' in cmd:
+    expect_type = 'relocatable'
+  else:
+    expect_type = 'executable'
+  assert IsElfLsb(TMPPROG, expect_static, expect_bits, expect_type), (
+      'compiler did not generate an ELF %d-bit LSB, static=%r '
+      '%s %s: %s' % (expect_bits, expect_static, expect_type, TMPPROG, cmd_str))
+  if expect_type == 'relocatable':
+    return
 
   if os.sep in TMPPROG:
     tmpprog_cmd = (TMPPROG,)
@@ -332,14 +360,16 @@ MSG_XSTATIC_HELP = (
     'Invokes the C/C++ compiler with -static against the xstatic uClibc.\n')
 MSG_XSTATIC_ARGV1DASH = (
     'xstatic: error: please specify gcc|clang prog in 1st arg\n')
+MSG_FLAG_M64_NOT_SUPPORTED = 'xstatic: error: flag not supported: -m64'
 
 DEFAULT_FLAGS = ('-s', '-O2', '-W', '-Wall')
 
 
-class XstaticTestBase(unittest.TestCase):
+class TestBase(unittest.TestCase):
   C_COMPILER  = None  # Must be overridden in subclasses.
   CC_COMPILER = None  # Must be overridden in subclasses.
   EXPECT_STATIC = True
+  EXPECT_BITS = 32
 
   def tearDown(self):
     MaybeRemove(TMPPROG)
@@ -357,7 +387,8 @@ class XstaticTestBase(unittest.TestCase):
                  is_cc=None, expect_compile_fail=None,
                  expect_stdout=True, expect_link_error=False,
                  expect_compile_warning=False, expect_runtime_error=False,
-                 expect_compile_error=False, expect_compile_stdout=False):
+                 expect_compile_error=False, expect_compile_stdout=False,
+                 expect_bits=None):
     if is_cc is None:
       if src_filename is None:
         raise ValueError('Please specify src_filename= or is_cc=')
@@ -373,6 +404,8 @@ class XstaticTestBase(unittest.TestCase):
     if src_filename is not None and os.sep not in src_filename:
       src_filename = os.path.join(SRCDIR, src_filename)
     cmd = list(compiler)
+    if ('-m32' in flags or '-m64' in flags) and cmd[-1] in ('-m32', '-m64'):
+      cmd.pop()
     if (expect_compile_error is True or expect_compile_warning) and (
         'clang' in GetProg(compiler)):
       # Clang Caret diagnostics are printed at the beginning of the line,
@@ -383,6 +416,8 @@ class XstaticTestBase(unittest.TestCase):
     if src_filename is not None:
       cmd.extend(('-o', TMPPROG, src_filename))
     cmd = tuple(cmd)
+    if expect_bits is None:
+      expect_bits = self.EXPECT_BITS
     AssertCompileRun(src_filename=src_filename, cmd=cmd,
                      expect_stdout=expect_stdout,
                      expect_compile_fail=expect_compile_fail,
@@ -391,10 +426,11 @@ class XstaticTestBase(unittest.TestCase):
                      expect_compile_warning=expect_compile_warning,
                      expect_compile_stdout=expect_compile_stdout,
                      expect_runtime_error=expect_runtime_error,
-                     expect_static=self.EXPECT_STATIC)
+                     expect_static=self.EXPECT_STATIC,
+                     expect_bits=expect_bits)
 
 
-class XstaticTestBaseCases(XstaticTestBase):
+class TestBaseCases(TestBase):
   def testNoInputFiles(self):
     self.AssertProg(None, is_cc=False, flags=(),
                     expect_compile_error=MSG_NO_INPUT_FILES)
@@ -402,6 +438,30 @@ class XstaticTestBaseCases(XstaticTestBase):
   def testNoInputFilesCc(self):
     self.AssertProg(None, is_cc=True, flags=(),
                     expect_compile_error=MSG_NO_INPUT_FILES)
+
+  def testNoInputFilesM32(self):
+    self.AssertProg(None, is_cc=False, flags=('-m32',),
+                    expect_compile_error=MSG_NO_INPUT_FILES)
+
+  def testNoInputFilesM32Cc(self):
+    self.AssertProg(None, is_cc=True, flags=('-m32',),
+                    expect_compile_error=MSG_NO_INPUT_FILES)
+
+  def testNoInputFilesM64(self):
+    if self.C_COMPILER and self.C_COMPILER[0] == XSTATIC:
+      self.AssertProg(None, is_cc=False, flags=('-m64',),
+                      expect_compile_error=MSG_FLAG_M64_NOT_SUPPORTED)
+    else:
+      self.AssertProg(None, is_cc=False, flags=('-m64',),
+                      expect_compile_error=MSG_NO_INPUT_FILES)
+
+  def testNoInputFilesM64Cc(self):
+    if self.CC_COMPILER and self.CC_COMPILER[0] == XSTATIC:
+      self.AssertProg(None, is_cc=True, flags=('-m64',),
+                      expect_compile_error=MSG_FLAG_M64_NOT_SUPPORTED)
+    else:
+      self.AssertProg(None, is_cc=True, flags=('-m64',),
+                      expect_compile_error=MSG_NO_INPUT_FILES)
 
   def testHelpOnly(self):
     self.AssertProg(None, is_cc=False, flags=('--help',),
@@ -421,8 +481,39 @@ class XstaticTestBaseCases(XstaticTestBase):
                     expect_compile_fail=False,
                     expect_compile_error=MSG_THREAD_MODEL)
 
+  def testM32DashVOnly(self):
+    self.AssertProg(None, is_cc=False, flags=('-m32', '-v',),
+                    expect_compile_fail=False,
+                    expect_compile_error=MSG_THREAD_MODEL)
+
+  def testM32DashVOnlyCc(self):
+    self.AssertProg(None, is_cc=True, flags=('-m32','-v',),
+                    expect_compile_fail=False,
+                    expect_compile_error=MSG_THREAD_MODEL)
+
+  def testM64DashVOnly(self):
+    if self.C_COMPILER and self.C_COMPILER[0] == XSTATIC:
+      self.AssertProg(None, is_cc=False, flags=('-m64', '-v'),
+                      expect_compile_error=MSG_FLAG_M64_NOT_SUPPORTED)
+    else:
+      self.AssertProg(None, is_cc=False, flags=('-m64', '-v',),
+                      expect_compile_fail=False,
+                      expect_compile_error=MSG_THREAD_MODEL)
+
+  def testM64DashVOnlyCc(self):
+    if self.CC_COMPILER and self.CC_COMPILER[0] == XSTATIC:
+      self.AssertProg(None, is_cc=True, flags=('-m64', '-v'),
+                      expect_compile_error=MSG_FLAG_M64_NOT_SUPPORTED)
+    else:
+      self.AssertProg(None, is_cc=True, flags=('-m64','-v',),
+                      expect_compile_fail=False,
+                      expect_compile_error=MSG_THREAD_MODEL)
+
   def testHellowC(self):
     self.AssertProg('hellow.c')
+
+  def testHellowCObj(self):
+    self.AssertProg('hellow.c', flags=('-c',))
 
   def testLinkerrC(self):
     self.AssertProg('linkerr.c', expect_link_error=True)
@@ -447,6 +538,9 @@ class XstaticTestBaseCases(XstaticTestBase):
 
   def testHelloCc(self):
     self.AssertProg('hello.cc')
+
+  def testHelloCcObj(self):
+    self.AssertProg('hello.cc', flags=('-c',))
 
   def testHelloCcNoExcNoRtti(self):
     self.AssertProg('hello.cc',
@@ -535,7 +629,7 @@ class XstaticTestBaseCases(XstaticTestBase):
                     **kwargs)
 
 
-class XstaticNoCompilerFlagsTest(XstaticTestBase):
+class XstaticNoCompilerFlagsTest(TestBase):
   C_COMPILER = CC_COMPILER = ()
 
   def testNoArg(self):
@@ -552,96 +646,136 @@ class XstaticNoCompilerFlagsTest(XstaticTestBase):
                     expect_compile_error=MSG_XSTATIC_ARGV1DASH)
 
 
-class SysGccTest(XstaticTestBaseCases):
-  EXPECT_STATIC = None
+class SysGccTest(TestBaseCases):
+  EXPECT_STATIC = False
   C_COMPILER  = ('gcc', '-m32')
   CC_COMPILER = ('g++', '-m32')
 
 
-class SysClangTest(XstaticTestBaseCases):
-  EXPECT_STATIC = None
+class SysGcc64Test(TestBaseCases):
+  EXPECT_STATIC = False
+  EXPECT_BITS = 64
+  C_COMPILER  = ('gcc', '-m64')
+  CC_COMPILER = ('g++', '-m64')
+
+
+class SysClangTest(TestBaseCases):
+  EXPECT_STATIC = False
   C_COMPILER  = ('clang',   '-m32')
   CC_COMPILER = ('clang++', '-m32')
 
 
-class LocalClangTest(XstaticTestBaseCases):
-  EXPECT_STATIC = None
+class SysClang64Test(TestBaseCases):
+  EXPECT_STATIC = False
+  EXPECT_BITS = 64
+  C_COMPILER  = ('clang',   '-m64')
+  CC_COMPILER = ('clang++', '-m64')
+
+
+class LocalClangTest(TestBaseCases):
+  EXPECT_STATIC = False
   C_COMPILER  = (LOCAL_CLANG,        '-m32')
   CC_COMPILER = (LOCAL_CLANG + '++', '-m32')
 
+  # This works even on a 32-bit system without 64-bit libs. Please note that
+  # we'd need to copy lots of files to clanginc64low/bits/ to make everything
+  # work, e.g. `#include <sys/select.h>' would need bits/select.h.
+  def testHellowCObj64(self):
+    self.AssertProg('hellow.c', flags=('-m64', '-c'), expect_bits=64)
 
-class LocalClangXsysldFlagTest(XstaticTestBaseCases):
-  EXPECT_STATIC = None
+  # This doesn't work on a 32-bit system without 64-bit libs, it would need
+  # the 64-bit /usr/include/c++/4.6/x86_64-linux-gnu/bits/c++config.h
+  #def testHelloCcObj64(self):
+  #  self.AssertProg('hello.cc', flags=('-m64', '-c'))
+
+
+class LocalClang64Test(TestBaseCases):
+  EXPECT_STATIC = False
+  EXPECT_BITS = 64
+  C_COMPILER  = (LOCAL_CLANG,        '-m64')
+  CC_COMPILER = (LOCAL_CLANG + '++', '-m64')
+
+
+class LocalClangXsysldFlagTest(TestBaseCases):
+  EXPECT_STATIC = False
   C_COMPILER  = (LOCAL_CLANG,        '-xsysld', '-m32')
   CC_COMPILER = (LOCAL_CLANG + '++', '-xsysld', '-m32')
 
 
-class LocalClangXstaticFlagTest(XstaticTestBaseCases):
+class LocalClang64XsysldFlagTest(TestBaseCases):
+  EXPECT_STATIC = False
+  EXPECT_BITS = 64
+  C_COMPILER  = (LOCAL_CLANG,        '-xsysld', '-m64')
+  CC_COMPILER = (LOCAL_CLANG + '++', '-xsysld', '-m64')
+
+
+class LocalClangXstaticFlagTest(TestBaseCases):
   C_COMPILER  = (LOCAL_CLANG,        '-xstatic')
   CC_COMPILER = (LOCAL_CLANG + '++', '-xstatic')
 
 
-class XstaticGccTest(XstaticTestBaseCases):
+class XstaticGccTest(TestBaseCases):
   C_COMPILER  = (XSTATIC, 'gcc')
   CC_COMPILER = (XSTATIC, 'g++')
 
 
-class XstaticGcc41Test(XstaticTestBaseCases):
+class XstaticGcc41Test(TestBaseCases):
   C_COMPILER  = (XSTATIC, 'gcc-4.1')
   CC_COMPILER = (XSTATIC, 'g++-4.1')
 
 
-class XstaticGcc42Test(XstaticTestBaseCases):
+class XstaticGcc42Test(TestBaseCases):
   C_COMPILER  = (XSTATIC, 'gcc-4.2')
   CC_COMPILER = (XSTATIC, 'g++-4.2')
 
 
-class XstaticGcc43Test(XstaticTestBaseCases):
+class XstaticGcc43Test(TestBaseCases):
   C_COMPILER  = (XSTATIC, 'gcc-4.3')
   CC_COMPILER = (XSTATIC, 'g++-4.3')
 
 
-class XstaticGcc44Test(XstaticTestBaseCases):
+class XstaticGcc44Test(TestBaseCases):
   C_COMPILER  = (XSTATIC, 'gcc-4.4')
   CC_COMPILER = (XSTATIC, 'g++-4.4')
 
 
-class XstaticGcc45Test(XstaticTestBaseCases):
+class XstaticGcc45Test(TestBaseCases):
   C_COMPILER  = (XSTATIC, 'gcc-4.5')
   CC_COMPILER = (XSTATIC, 'g++-4.5')
 
 
-class XstaticGcc46Test(XstaticTestBaseCases):
+class XstaticGcc46Test(TestBaseCases):
   C_COMPILER  = (XSTATIC, 'gcc-4.6')
   CC_COMPILER = (XSTATIC, 'g++-4.6')
 
 
-class XstaticGcc47Test(XstaticTestBaseCases):
+class XstaticGcc47Test(TestBaseCases):
   C_COMPILER  = (XSTATIC, 'gcc-4.7')
   CC_COMPILER = (XSTATIC, 'g++-4.7')
 
 
-class XstaticGcc48Test(XstaticTestBaseCases):
+class XstaticGcc48Test(TestBaseCases):
   C_COMPILER  = (XSTATIC, 'gcc-4.8')
   CC_COMPILER = (XSTATIC, 'g++-4.8')
 
 
-class XstaticGcc49Test(XstaticTestBaseCases):
+class XstaticGcc49Test(TestBaseCases):
   C_COMPILER  = (XSTATIC, 'gcc-4.9')
   CC_COMPILER = (XSTATIC, 'g++-4.9')
 
 
-class XstaticClangTest(XstaticTestBaseCases):
+class XstaticClangTest(TestBaseCases):
   C_COMPILER  = (XSTATIC, 'clang')
   CC_COMPILER = (XSTATIC, 'clang++')
 
 
-class XstaticLocalClangTest(XstaticTestBaseCases):
+class XstaticLocalClangTest(TestBaseCases):
   C_COMPILER  = (XSTATIC, LOCAL_CLANG)
   CC_COMPILER = (XSTATIC, LOCAL_CLANG + '++')
 
 
 if __name__ == '__main__':
+  os.chdir(os.path.dirname(__file__))
   hc = os.path.join(SRCDIR, 'hellow.c')
   assert os.path.isfile(hc), 'not found: %s' % hc
   del hc

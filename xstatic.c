@@ -750,9 +750,17 @@ int main(int argc, char **argv) {
   --argc;
   argp = args = malloc(sizeof(*args) * (argc + 20));
   *argp++ = prog;  /* Set destination argv[0]. */
-  if (!argv[1] || (!argv[2] && 0 == strcmp(argv[1], "-v"))) {
+  /* No need to check for -m64, check_bflags has already done that. */
+  if (!argv[1] ||
+      (!argv[2] &&
+       (0 == strcmp(argv[1], "-v") || 0 == strcmp(argv[1], "-m32"))) ||
+      (argv[2] && !argv[3] &&
+       0 == strcmp(argv[1], "-m32") &&
+       0 == strcmp(argv[2], "-v"))) {
     /* This changes the `Target: ...' of Clang to i386, but of GCC. */
-    *argp++ = "-m32";
+    if (!argv[1] || (!argv[2] && 0 != strcmp(argv[1], "-m32"))) {
+      *argp++ = "-m32";
+    }
     /* Don't add any flags, because the user wants some version info, and with
      * `-Wl,... -v' gcc and clang won't display version info.
      */

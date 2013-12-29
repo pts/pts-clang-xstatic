@@ -71,11 +71,16 @@ Developer info:
 
 TODOs for the current release:
 
+* TODO(pts): How many copies of our ld to store?
 * TODO(pts): Create .7z for old and new uclibc libstdc++.
 * TODO(pts): Create downloads, remove backup files.
 
 TODOs for documentation:
 
+* TODO(pts): Feature: clang can compile 64-bit C object files (no C++, would
+             need 64-bit C++ headers, no select.h in clanginc64low). clang can
+             link 64-bit executables if 64-bit libc is installed. (xstatic
+             doesn't work with 64-bit.)
 * TODO(pts): Our local clang on Debian Jessie needs for C++ compilation:
 *            ln -snf i386-linux-gnu /usr/include/i486-linux-gnu
 * TODO(pts): Is LTO (link-time-optimization) enabled in gold by default? If
@@ -92,6 +97,8 @@ TODOs for documentation:
 
 TODOs for new features:
 
+# TODO(pts): Copy bits/select.h to clanginc64low/bits/ , and write test for
+#            including all C headers into LocalClang64Test.
 * TODO(pts): Test include_many.cc with -std=c++0x.
 * TODO(pts): Add testing framework to run `clang -xsysld' etc. tests.
 * TODO(pts): Add TCC compiler.

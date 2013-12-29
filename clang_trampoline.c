@@ -571,6 +571,10 @@ static void check_ld_crtoarg(char **argv, char is_xstatic) {
   if (had_error) exit(122);
 }
 
+static char is_m32_or_m64(const char *arg) {
+  return 0 == strcmp(arg, "-m32") || 0 == strcmp(arg, "-m64");
+}
+
 /* Returns a newly malloced string containing the directory 1 level above
  * the specified directory.
  */
@@ -760,12 +764,19 @@ int main(int argc, char **argv) {
   }
   if (!argv[1] ||
       (!argv[2] && 0 == strcmp(argv[1], "-v")) ||
-      (!argv[2] && 0 == strcmp(argv[1], "-m32")) ||
-      (0 == strcmp(argv[1], "-m32") && argv[2] && 0 == strcmp(argv[2], "-v") &&
+      (!argv[2] && is_m32_or_m64(argv[1])) ||
+      (is_m32_or_m64(argv[1]) && argv[2] && 0 == strcmp(argv[2], "-v") &&
        !argv[3])) {
     char is_v = !argv[1] || 0 == strcmp(argv[1], "-v") ||
         (argv[2] && 0 == strcmp(argv[2], "-v"));
-    if (!argv[1] || 0 != strcmp(argv[1], "-m32")) *argp++ = "-m32";
+    archbit_t archbit, archbit_override;
+    archbit = get_archbit_detected(argv);
+    archbit_override = get_archbit_override(archbit);
+    if (archbit_override == ARCHBIT_32) {
+      *argp++ = "-m32";
+    } else if (archbit_override == ARCHBIT_64) {
+      *argp++ = "-m64";
+    }
     /* Don't add any flags, because the user wants some version info, and with
      * `-Wl,... -v' gcc and clang won't display version info.
      */
