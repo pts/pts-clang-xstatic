@@ -97,8 +97,10 @@ TODOs for documentation:
 
 TODOs for new features:
 
-# TODO(pts): Copy bits/select.h to clanginc64low/bits/ , and write test for
-#            including all C headers into LocalClang64Test.
+* TODO(pts): Diagnose and fix clang compilation error (see in the file) in
+             testsrc/intersection_update.cc .
+* TODO(pts): Copy bits/select.h to clanginc64low/bits/ , and write test for
+             including all C headers into LocalClang64Test.
 * TODO(pts): Test include_many.cc with -std=c++0x.
 * TODO(pts): Add testing framework to run `clang -xsysld' etc. tests.
 * TODO(pts): Add TCC compiler.
