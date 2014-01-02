@@ -680,7 +680,7 @@ int main(int argc, char **argv) {
         eprog = find_on_path(eargp[-1]);
         if (!eprog) {
           fdprint(2, strdupcat(
-              "error: could not find ermine on $PATH: ", eargp[-1], "\n"));
+              "error: could not find Ermine: ", eargp[-1], "\n"));
           return 126;
         }
         free(eprog);
