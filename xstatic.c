@@ -674,7 +674,7 @@ int main(int argc, char **argv) {
          * because non-xstatic compilers do the same.
          */
         *argp++ = strdupcat("-L", dirup, "/xstaticcld");
-        *argp++ = strdupcat("-L", dirup, "/uclibcusr/lib");
+        *argp++ = strdupcat("-L", dirup, "/xstaticusr/lib");
         argli = NULL;  /* Don't insert the -L flags again. */
       }
       if (0 == strcmp(arg, "-z") &&
@@ -731,11 +731,11 @@ int main(int argc, char **argv) {
         "xstatic: error: file missing, please install: ", p, "\n"));
     return 123;
   }
-  p = strdupcat(dirup, "/uclibcusr/lib/libc.a", "");
+  p = strdupcat(dirup, "/xstaticusr/lib/libc.a", "");
   if (0 != stat(p, &st) || !S_ISREG(st.st_mode)) goto file_missing;
-  p = strdupcat(dirup, "/uclibcusr/include/stdio.h", "");
+  p = strdupcat(dirup, "/xstaticusr/include/stdio.h", "");
   if (0 != stat(p, &st) || !S_ISREG(st.st_mode)) goto file_missing;
-  p = strdupcat(dirup, "/uclibcusr/lib/crt1.o", "");
+  p = strdupcat(dirup, "/xstaticusr/lib/crt1.o", "");
   if (0 != stat(p, &st) || !S_ISREG(st.st_mode)) goto file_missing;
   p = strdupcat(dirup, "/xstaticcld/crtbeginT.o", "");
   if (0 != stat(p, &st) || !S_ISREG(st.st_mode)) goto file_missing;
@@ -781,7 +781,7 @@ int main(int argc, char **argv) {
      * of ours.
      */
     *argp++ = strdupcat("-B", dirup, "/xstaticcld");
-    /* This puts uclibcusr/include to the top of the include path, and keeps
+    /* This puts xstaticusr/include to the top of the include path, and keeps
      * the gcc or clang headers below that. Specifying --nostdinc (when
      * lang.is_compiling) would remove these compiler-specific headers (e.g.
      * stdarg.h), which we don't want removed, because libc headers depend
@@ -825,15 +825,15 @@ int main(int argc, char **argv) {
            * header, and fail with a confusing error message when parsing it.
            */
           *argp++ = "-isystem";
-          *argp++ = strdupcat(dirup, "/uclibcusr/c++include", "");
+          *argp++ = strdupcat(dirup, "/xstaticusr/c++include", "");
           /* Regular g++ libstdc++ has non-backward and then backward. */
           *argp++ = "-isystem";
-          *argp++ = strdupcat(dirup, "/uclibcusr/c++include/backward", "");
+          *argp++ = strdupcat(dirup, "/xstaticusr/c++include/backward", "");
         }
       }
       if (!has_nostdinc) {
         *argp++ = "-isystem";
-        *argp++ = strdupcat(dirup, "/uclibcusr/include", "");
+        *argp++ = strdupcat(dirup, "/xstaticusr/include", "");
       }
     }
 

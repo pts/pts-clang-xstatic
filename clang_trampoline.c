@@ -744,7 +744,7 @@ int main(int argc, char **argv) {
            * because non-xstatic compilers do the same.
            */
           *argp++ = strdupcat("-L", dirup, "/xstaticcld");
-          *argp++ = strdupcat("-L", dirup, "/uclibcusr/lib");
+          *argp++ = strdupcat("-L", dirup, "/xstaticusr/lib");
           argli = NULL;  /* Don't insert the -L flags again. */
         }
         if (0 == strcmp(arg, "-z") &&
@@ -909,13 +909,13 @@ int main(int argc, char **argv) {
          * fenv.h).
          */
         *argp++ = "-isystem";
-        *argp++ = strdupcat(dirup, "/uclibcusr/c++include", "");
+        *argp++ = strdupcat(dirup, "/xstaticusr/c++include", "");
         /* Regular g++ libstdc++ has non-backward and then backward. */
         *argp++ = "-isystem";
-        *argp++ = strdupcat(dirup, "/uclibcusr/c++include/backward", "");
+        *argp++ = strdupcat(dirup, "/xstaticusr/c++include/backward", "");
       }
       if (!has_nostdinc) {
-        p = strdupcat(dirup, "/uclibcusr/include", "");
+        p = strdupcat(dirup, "/xstaticusr/include", "");
         if (0 != stat(p, &st) || !S_ISDIR(st.st_mode)) goto dir_missing;
         *argp++ = "-isystem";
         *argp++ = p;
@@ -941,9 +941,9 @@ int main(int argc, char **argv) {
           "error: file missing for -xstatic, please install: ", p, "\n"));
       return 123;
     }
-    p = strdupcat(dirup, "/uclibcusr/lib/libc.a", "");
+    p = strdupcat(dirup, "/xstaticusr/lib/libc.a", "");
     if (0 != stat(p, &st) || !S_ISREG(st.st_mode)) goto file_missing;
-    p = strdupcat(dirup, "/uclibcusr/lib/crt1.o", "");
+    p = strdupcat(dirup, "/xstaticusr/lib/crt1.o", "");
     if (0 != stat(p, &st) || !S_ISREG(st.st_mode)) goto file_missing;
     p = strdupcat(dirup, "/clangldxs/crtbeginT.o", "");
     if (0 != stat(p, &st) || !S_ISREG(st.st_mode)) goto file_missing;
