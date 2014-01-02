@@ -68,45 +68,33 @@ Developer info:
   you'll get an undefined symbol error for __gcc_personality_sj0.
 * a.out size is the same (817404 on both narancs and laptop)
   for `../xstatic ../clang++ ~/prg/hello.cc'. Good.
+* Binary release archives were created with:
+
+  $ rm -f pts-clang-latest.sfx.7z && time 7z a -t7z -mx=7 -md=8m -ms=on -sfx../../../../../../../../"$PWD"/7z9.22LinuxI386ConTiny.sfx pts-clang-latest.sfx.7z pts-clang
+  $ rm -f pts-xstatic-latest.sfx.7z && time 7z a -t7z -mx=7 -md=8m -ms=on -sfx../../../../../../../../"$PWD"/7z9.22LinuxI386ConTiny.sfx pts-xstatic-latest.sfx.7z pts-xstatic
+  $ rm -f pts-static-binu-latest.sfx.7z && time 7z a -t7z -mx=7 -md=8m -ms=on -sfx../../../../../../../../"$PWD"/7z9.22LinuxI386ConTiny.sfx pts-static-binu-latest.sfx.7z pts-static-binu
+  $ chmod 755 *.sfz.7z
 
 TODOs for the current release:
 
-* TODO(pts): How many copies of our ld to store?
 * TODO(pts): Create .7z for old and new uclibc libstdc++.
 * TODO(pts): Create downloads, remove backup files.
-
-TODOs for documentation:
-
-* TODO(pts): -xermine:
-             ln -s ~/Downloads/ErmineLight.i386 ~/prg/clang/bin/ermine
-             ~/clang/bin/clang -xermine -s -xermine,-v -O2 -W -Wall hellow.c
-* TODO(pts): Feature: clang can compile 64-bit C object files (no C++, would
-             need 64-bit C++ headers, no select.h in clanginc64low). clang can
-             link 64-bit executables if 64-bit libc is installed. (xstatic
-             doesn't work with 64-bit.)
-* TODO(pts): Our local clang on Debian Jessie needs for C++ compilation:
-             ln -snf i386-linux-gnu /usr/include/i486-linux-gnu
-* TODO(pts): Is LTO (link-time-optimization) enabled in gold by default? If
-             not, how to enable it?
-* TODO(pts): Write README.txt for all 3 projects.
-* TODO(pts): Use TCC for C compilation speed comparisons.
-* TODO(pts): Document how libstdc++ was compiled.
-* TODO(pts): Create libstdc++ .patch.
-* TODO(pts): Document minimum g++ version: 4.2. 4.1 gives too many errors.
-             Does gcc-4.1 work? yes.
-* TODO(pts): Document new conditions in usr/include/bits/cpp_type_traits.h,
-             usr/include/bits/builtin_type_traits.h,
-             and usr/include/limits and other libstdc++ changes.
+* TODO(pts): Advertise Ermine on the blog.
 
 TODOs for new features:
 
+* TODO(pts): Document how libstdc++ was compiled.
+* TODO(pts): Is LTO (link-time-optimization) enabled in gold by default? If
+             not, how to enable it?
+* TODO(pts): Add ar, ranlib and strip.
 * TODO(pts): Diagnose and fix clang compilation error (see in the file) in
              testsrc/intersection_update.cc .
 * TODO(pts): Copy bits/select.h to clanginc64low/bits/ , and write test for
              including all C headers into LocalClang64Test.
 * TODO(pts): Test include_many.cc with -std=c++0x.
 * TODO(pts): Add testing framework to run `clang -xsysld' etc. tests.
-* TODO(pts): Add TCC compiler.
+* TODO(pts): Use TCC for C compilation speed comparisons. (Please note that
+  the binaries are too large, and can't be stripped.)
 * TODO(pts): Use the linker in TCC as the mini linker. Constructors seem to
   be fine.
   It works, but the resulting C++ binaries are too large (hello.o linked
