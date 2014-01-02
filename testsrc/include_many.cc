@@ -21,7 +21,7 @@
 // #include <cstdint>  // Needs: -std=c++0x or -std=gnu++0x
 #include <cstdlib>
 #include <cstring>
-// Includes <bits/builting_type_traits.h> (if available), and makes
+// Includes <bits/builtin_type_traits.h> (if available), and makes
 // __is_pod, __is_empty and __has_trivial_destructor available.
 #include <bits/stl_construct.h>
 // #include <type_traits>  // Needs: -std=c++0x or -std=gnu++0x.
