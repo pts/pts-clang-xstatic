@@ -551,6 +551,9 @@ class TestBaseCases(TestBase):
   def testHellostrCc(self):
     self.AssertProg('hellostr.cc')
 
+  def testIncludeExceptionCc(self):
+    self.AssertProg('include_exception.cc', flags=('-std=c++0x',))
+
   def testIncludeManyCc(self):
     self.AssertProg('include_many.cc')
 
