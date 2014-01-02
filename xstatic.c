@@ -508,7 +508,7 @@ static void detect_lang(const char *prog, char **argv, lang_t *lang) {
  * (e.g. /usr/lib/...) directory.
  */
 static void check_ld_crtoarg(char **argv) {
-  /* If a relevant *crt*.o file is missing in xstaticcld or xstaticfld, then
+  /* If a relevant *crt*.o file is missing from xstaticcld, then
    * gcc generates e.g.
    * /usr/lib/gcc/x86_64-linux-gnu/4.6/../../../i386-linux-gnu/crtn.o , and
    * pts-static-clang generates crtn.o . We detect and fail on both.

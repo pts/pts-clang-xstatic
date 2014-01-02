@@ -518,7 +518,7 @@ static void detect_lang(const char *prog, char **argv, lang_t *lang) {
  * (e.g. /usr/lib/...) directory.
  */
 static void check_ld_crtoarg(char **argv, char is_xstatic) {
-  /* If a relevant *crt*.o file is missing in xstaticcld or xstaticfld, then
+  /* If a relevant *crt*.o file is missing in xstaticcld or clangldxs, then
    * gcc generates e.g.
    * /usr/lib/gcc/x86_64-linux-gnu/4.6/../../../i386-linux-gnu/crtn.o , and
    * pts-static-clang generates crtn.o . We detect and fail on both.
@@ -934,7 +934,7 @@ int main(int argc, char **argv) {
         *argp++ = p;
       }
     }
-    p = strdupcat(dirup, "/xstaticfld/ld.bin", "");
+    p = strdupcat(dirup, "/clangldxs/ld.bin", "");
     if (0 != stat(p, &st) || !S_ISREG(st.st_mode)) {
      file_missing:
       fdprint(2, strdupcat(
@@ -945,12 +945,12 @@ int main(int argc, char **argv) {
     if (0 != stat(p, &st) || !S_ISREG(st.st_mode)) goto file_missing;
     p = strdupcat(dirup, "/uclibcusr/lib/crt1.o", "");
     if (0 != stat(p, &st) || !S_ISREG(st.st_mode)) goto file_missing;
-    p = strdupcat(dirup, "/xstaticfld/crtbeginT.o", "");
+    p = strdupcat(dirup, "/clangldxs/crtbeginT.o", "");
     if (0 != stat(p, &st) || !S_ISREG(st.st_mode)) goto file_missing;
-    /* The linker would be ../xstaticfld/ld, which is also a trampoline binary
+    /* The linker would be ../clangldxs/ld, which is also a trampoline binary
      * of ours.
      */
-    *argp++ = strdupcat("-B", dirup, "/xstaticfld");
+    *argp++ = strdupcat("-B", dirup, "/clangldxs");
     /* Run `clang -print-search-dirs' to confirm that it was properly
      * detected.
      */
