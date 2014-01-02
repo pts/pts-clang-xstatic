@@ -868,13 +868,14 @@ int main(int argc, char **argv) {
           exit(WIFEXITED(status) ? WEXITSTATUS(status) : 124);
         }
         /* Print at the end of the output, after exec. */
-        fdprint(is_v ? 2 : 1, "Additinal flags supported: -xstatic -xsysld\n");
+        fdprint(is_v ? 2 : 1,
+            "Additinal flags supported: -xstatic -xsysld -xermine\n");
         exit(0);
       }
     }
     memcpy(argp, argv + 1, argc * sizeof(*argp));
   } else if (argv[1] && 0 == strcmp(argv[1], "--help")) {
-    fdprint(1, "Additinal flags supported: -xstatic -xsysld\n");
+    fdprint(1, "Additinal flags supported: -xstatic -xsysld -xermine\n");
     memcpy(argp, argv + 1, argc * sizeof(*argp));
   } else if (ldmode == LM_XSTATIC) {
     struct stat st;
