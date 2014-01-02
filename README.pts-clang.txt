@@ -96,10 +96,11 @@ END
 $ pts-clang/bin/clang++ -s -O2 -W -Wall hellow.cc && ./a.out
 Hello, World++!
 
-C compilation with -xermine:
+C compilation with -xermine (if you have an Ermine license and have Ermine
+installed):
 
-  $ pts-clang/bin/clang -xermine -s -xermine,-v -O2 -W -Wall hellow.c && ./a.out
-  Hello, World!
+$ pts-clang/bin/clang -xermine -s -xermine,-v -O2 -W -Wall hellow.c && ./a.out
+Hello, World!
 
 C++11 and C++0x compatibility
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
