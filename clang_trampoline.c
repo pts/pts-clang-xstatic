@@ -1049,6 +1049,9 @@ int main(int argc, char **argv) {
         if (ldmode != LM_XCLANGLD) {
           /* With -xsysld our it's not our linker which is running, so we can't
            * pass special flag -xermine... to it.
+           *
+           * `gcc -print-prog-name=ld' would be needed for -xsysld, but it is
+           * not reliable since `i686-gcc -print-prog-name=ld' prints ld.
            */
           fdprint(2, strdupcat(
               "error: flag incompatible with -xsysld: ", arg, "\n"));

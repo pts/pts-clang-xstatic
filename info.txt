@@ -125,5 +125,8 @@ TODOs for new features:
              hellow.c 120 bytes larger without -xsysld?
 * TODO(pts): Upgrade the pts-clang-xstatic linker? It seems to work fine.
              What about linking speed?
+* TODO(pts): Make -xsysld and -xermine compatible by implementing -xermine
+             in the compiler frontend level (rather than at the linker
+             level).
 
 __EOF__
