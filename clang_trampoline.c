@@ -364,8 +364,8 @@ static void check_xflags(char **argv) {
         /* TODO(pts): Accept a few targets (and don't pass the flag). */
         0 == strcmp(arg, "-target") ||  /* Clang-specific. */
         0 == strcmp(arg, "-m64") ||
-        0 == strcmp(arg, "-sysld") ||
-        0 == strcmp(arg, "--sysld") ||
+        0 == strcmp(arg, "-xsysld") ||
+        0 == strcmp(arg, "--xsysld") ||
         0 == strcmp(arg, "-p") ||  /* Needs Mcrt1.o (| gcrt1.o), clang crt1.o */
         0 == strcmp(arg, "-pg") ||  /* Needs gcrt1.o, clang uses crt1.o */
         0 == strcmp(arg, "-pie") ||
@@ -374,9 +374,11 @@ static void check_xflags(char **argv) {
         0 == strcmp(arg, "-fpie") ||
         0 == strcmp(arg, "-fPIE") ||
         0 == strcmp(arg, "-shared") ||
-        0 == strcmp(arg, "-shared-libgcc")) {
+        0 == strcmp(arg, "-shared-libgcc") ||
+        0 == strcmp(arg, "-xermine") ||
+        0 == strncmp(arg, "-xermine,", 9)) {
       fdprint(2, strdupcat(
-          "error: flag not supported in this ldmode: ", arg, "\n"));
+          "error: flag not supported in ldmode -xstatic: ", arg, "\n"));
       exit(122);
     }
   }
@@ -592,7 +594,7 @@ static char *get_up_dir_alloc(const char *dir) {
     *p = '\0';
   } else if (dirup[0] == '/' && dirup[1] == '\0') {
     fdprint(2, strdupcat("error: no parent dir for: ", dir, "\n"));
-    exit(122);
+    exit(126);
   } else {
     p[-1] = '\0';  /* Remove basename of dirup. */
   }
@@ -618,7 +620,7 @@ int main(int argc, char **argv) {
   dir = find_on_path(argv[0]);
   if (!dir) {
     fdprint(2, "error: could not find myself on $PATH\n");
-    return 122;
+    return 126;
   }
   dir = readlink_alloc_all(dir);
   for (p = dir + strlen(dir); p != dir && p[-1] != '/'; --p) {}
@@ -642,6 +644,8 @@ int main(int argc, char **argv) {
      * --build-id (because not supported by old ld)
      * -z relro (because it increases the binary size and it's useless for static)
      */
+    char **ermine_args = NULL;
+    char *output_file = 0;
     argp = args = malloc(sizeof(*args) * (argc + 5));
     *argp++ = argv0 = *argv;
     ldmode = LM_XSTATIC;
@@ -654,11 +658,54 @@ int main(int argc, char **argv) {
     }
     check_ld_crtoarg(argv, ldmode == LM_XSTATIC);
     if (ldmode == LM_XCLANGLD) {
+      char is_ermine = 0;
+      int ermine_flag_count = 0;
+      char **eargp = NULL;
+      output_file = "a.out";
       for (argi = argv + 1; (arg = *argi); ++argi) {
-        if (0 != strcmp(arg, "--do-xclangld") &&
-            0 != strcmp(arg, "--do-clangldv")) {
+        if (0 == strcmp(arg, "-=xermine")) {
+          is_ermine = 1;
+        } else if (0 == strncmp(arg, "-=xermine=", 10)) {
+          is_ermine = 1;
+          ++ermine_flag_count;
+        } else if (arg[0] == '-' && arg[1] == 'o') {
+          output_file = (arg[2] == '\0' && argi[1] != NULL) ? *++argi : arg + 2;
+        }
+      }
+      if (is_ermine) {
+        char *eprog;
+        eargp = ermine_args = malloc(
+            sizeof(*ermine_args) * (ermine_flag_count + 4));
+        *eargp++ = strdupcat(dir, "/ermine", "");
+        eprog = find_on_path(eargp[-1]);
+        if (!eprog) {
+          fdprint(2, strdupcat(
+              "error: could not find ermine on $PATH: ", eargp[-1], "\n"));
+          return 126;
+        }
+        free(eprog);
+        *eargp++ = "-o";
+        *eargp++ = output_file;
+        output_file = strdupcat(output_file, ".eE0", "");
+      }
+      for (argi = argv + 1; (arg = *argi); ++argi) {
+        if (0 == strcmp(arg, "--do-xclangld") ||
+            0 == strcmp(arg, "--do-clangldv") ||
+            0 == strcmp(arg, "-=xermine")) {
+        } else if (0 == strncmp(arg, "-=xermine=", 10)) {
+          *eargp++ = arg + 10;
+        } else if (is_ermine && arg[0] == '-' && arg[1] == 'o') {
+          /* Skip the original output_file argument. */
+          if (arg[2] == '\0' && argi[1] != NULL) ++argi;
+        } else {
           *argp++ = *argi;
         }
+      }
+      if (is_ermine) {
+        *argp++ = "-o";
+        *argp++ = output_file;
+        *eargp++ = output_file;
+        *eargp = NULL;
       }
     } else {  /* ldmode == LM_XSTATIC. */
       char **argli;  /* Where to add the -L flags. */
@@ -730,6 +777,35 @@ int main(int argc, char **argv) {
     if (is_verbose) {
       fdprint(2, escape_argv("info: running ld:\n", args, "\n"));
     }
+    if (ermine_args) {
+      pid_t pid = fork();
+      if (pid < 0) exit(124);
+      if (pid != 0) {  /* Parent. */
+        int status;
+        pid_t pid2 = waitpid(pid, &status, 0);
+        if (pid != pid2) exit(124);
+        if (status != 0) {
+          unlink(output_file);  /* The .eE0 file. */
+          exit(WIFEXITED(status) ? WEXITSTATUS(status) : 124);
+        }
+        /* Done with ld, run ermine. */
+        if (is_verbose) {
+          fdprint(2, escape_argv("info: running ermine:\n", ermine_args, "\n"));
+        }
+        pid = fork();
+        if (pid < 0) exit(124);
+        if (pid == 0) {  /* Child. */
+          execv(ermine_args[0], ermine_args);
+          fdprint(2, strdupcat(
+              "error: clang-ermine: exec failed: ", ermine_args[0], "\n"));
+          exit(120);
+        }
+        pid2 = waitpid(pid, &status, 0);
+        unlink(output_file);  /* The .eE0 file. */
+        if (pid != pid2) exit(124);
+        exit(WIFEXITED(status) ? WEXITSTATUS(status) : 124);
+      }
+    }
     execv(prog, args);
     fdprint(2, strdupcat("error: clang-ld: exec failed: ", prog, "\n"));
     return 120;
@@ -796,8 +872,10 @@ int main(int argc, char **argv) {
         exit(0);
       }
     }
+    memcpy(argp, argv + 1, argc * sizeof(*argp));
   } else if (argv[1] && 0 == strcmp(argv[1], "--help")) {
     fdprint(1, "Additinal flags supported: -xstatic -xsysld\n");
+    memcpy(argp, argv + 1, argc * sizeof(*argp));
   } else if (ldmode == LM_XSTATIC) {
     struct stat st;
     char need_linker;
@@ -899,7 +977,6 @@ int main(int argc, char **argv) {
       }
     }
     *argp++ = NULL;
-    argc = 0;
   } else if (argv[1] && 0 == strcmp(argv[1], "-cc1")) {
     /* The Ermine binary wouldn't work anyway, because it opens its argv[0]. */
     fdprint(2, "error: clang: unexpected backend (-cc1) invocation\n");
@@ -961,8 +1038,35 @@ int main(int argc, char **argv) {
         *argp++ = strdupcat(dirup, "/clanginc64low", "");
       }
     }
+    for (++argv; (arg = *argv); ++argv) {
+      if (0 == strcmp(arg, "-xsysld") || 0 == strcmp(arg, "--xsysld") ||
+          0 == strcmp(arg, "-xstatic") || 0 == strcmp(arg, "--xstatic")) {
+        fdprint(2, strdupcat("error: flag specified too late: ", arg, "\n"));
+        exit(122);
+      } else if (0 == strcmp(arg, "-xermine") ||
+                 0 == strncmp(arg, "-xermine,", 9)) {
+        if (ldmode != LM_XCLANGLD) {
+          /* With -xsysld our it's not our linker which is running, so we can't
+           * pass special flag -xermine... to it.
+           */
+          fdprint(2, strdupcat(
+              "error: flag incompatible with -xsysld: ", arg, "\n"));
+          exit(122);
+        }
+        if (need_linker) {
+          *argp = strdupcat("-Wl,-=", "", arg + 1);  /* -=xermine,foo */
+          /* When passing -Wl,-=foo,bar, two args `-=foo bar' will be passed
+           * to the linker, so wi pass an = instead of a , here.
+           */
+         if (argp[0][13] == ',') argp[0][13] = '=';
+          ++argp;
+        }
+      } else {
+        *argp++ = arg;
+      }
+    }
+    *argp++ = NULL;
   }
-  memcpy(argp, argv + 1, argc * sizeof(*argp));
   if (is_verbose) {
     fdprint(2, escape_argv("info: running clang frontend:\n", args, "\n"));
   }

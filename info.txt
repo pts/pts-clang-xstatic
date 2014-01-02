@@ -77,12 +77,15 @@ TODOs for the current release:
 
 TODOs for documentation:
 
+* TODO(pts): -xermine:
+             ln -s ~/Downloads/ErmineLight.i386 ~/prg/clang/bin/ermine
+             ~/clang/bin/clang -xermine -s -xermine,-v -O2 -W -Wall hellow.c
 * TODO(pts): Feature: clang can compile 64-bit C object files (no C++, would
              need 64-bit C++ headers, no select.h in clanginc64low). clang can
              link 64-bit executables if 64-bit libc is installed. (xstatic
              doesn't work with 64-bit.)
 * TODO(pts): Our local clang on Debian Jessie needs for C++ compilation:
-*            ln -snf i386-linux-gnu /usr/include/i486-linux-gnu
+             ln -snf i386-linux-gnu /usr/include/i486-linux-gnu
 * TODO(pts): Is LTO (link-time-optimization) enabled in gold by default? If
              not, how to enable it?
 * TODO(pts): Write README.txt for all 3 projects.
@@ -92,8 +95,8 @@ TODOs for documentation:
 * TODO(pts): Document minimum g++ version: 4.2. 4.1 gives too many errors.
              Does gcc-4.1 work? yes.
 * TODO(pts): Document new conditions in usr/include/bits/cpp_type_traits.h,
-*            usr/include/bits/builtin_type_traits.h,
-*            and usr/include/limits and other libstdc++ changes.
+             usr/include/bits/builtin_type_traits.h,
+             and usr/include/limits and other libstdc++ changes.
 
 TODOs for new features:
 
@@ -118,7 +121,8 @@ TODOs for new features:
 * TODO(pts): Make multiple clang-... version coexist in bin and clanginclude.
 * TODO(pts): Recompile or relink Clang 3.3 statically.
 * TODO(pts): Does LM_CLANGLD need -lgcc? Which symbols?
-* TODO(pts): Why is include_many.cc 160 bytes larger without -xsysld?
+* TODO(pts): Why is include_many.cc 160 bytes larger without -xsysld, and
+             hellow.c 120 bytes larger without -xsysld?
 * TODO(pts): Upgrade the pts-clang-xstatic linker? It seems to work fine.
              What about linking speed?
 

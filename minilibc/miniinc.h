@@ -117,5 +117,6 @@ extern int close(int __fd);
 extern int memcmp(__const void *__s1, __const void *__s2, size_t __n) __attribute__((__nothrow__)) __attribute__((__pure__)) __attribute__((__nonnull__(1, 2)));
 extern __pid_t fork(void) __attribute__((__nothrow__));
 extern __pid_t waitpid(__pid_t __pid, int *__stat_loc, int __options);
+extern int unlink(__const char *__name) __attribute__((__nothrow__)) __attribute__((__nonnull__(1)));
 
 #endif  /* _MINIINCH_ */
