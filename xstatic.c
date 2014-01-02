@@ -790,8 +790,8 @@ int main(int argc, char **argv) {
      * TODO(pts): Make /usr/local/bin/clang also work.
      */
     *argp++ = strdupcat("--sysroot=", dirup,
-        lang.is_clang && is_dirprefix(prog, "/usr/bin") ? "/clangempty" :
-        "/empty");
+        lang.is_clang && is_dirprefix(prog, "/usr/bin") ?
+        "/xstaticclangempty" : "/xstaticempty");
     if (lang.is_compiling) {
       /*
        * Without this we get the following error compiling binutils 2.20.1:
