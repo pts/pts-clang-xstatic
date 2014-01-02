@@ -36,7 +36,7 @@ diff -N -u -U10 -r c++include.orig/bits/builtin_type_traits.h c++include/bits/bu
 +// In gcc-4.2 __is_pod is not defined, so we emulate it. In gcc-4.3 and later
 +// __is_pod is a build-in, and defining std::__is_pod is a syntax error, so
 +// we just don't do anything. In neither is the __is_pod macro defined by
-+// default.
++// default. Please `#include <bits/stl_construct.h>' instead in portable code.
 +
 +#ifndef _BUILTIN_TYPE_TRAITS_H
 +#define _BUILTIN_TYPE_TRAITS_H 1
