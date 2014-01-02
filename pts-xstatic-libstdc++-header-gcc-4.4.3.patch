@@ -1,0 +1,908 @@
+diff -N -u -U10 -r c++include.orig/bits/allocator.h c++include/bits/allocator.h
+--- c++include.orig/bits/allocator.h	2013-12-18 23:55:16.000000000 +0100
++++ c++include/bits/allocator.h	2013-12-19 02:27:54.000000000 +0100
+@@ -39,20 +39,21 @@
+ /** @file allocator.h
+  *  This is an internal header file, included by other library headers.
+  *  You should not attempt to use it directly.
+  */
+ 
+ #ifndef _ALLOCATOR_H
+ #define _ALLOCATOR_H 1
+ 
+ // Define the base class to std::allocator.
+ #include <bits/c++allocator.h>
++#include <bits/builtin_type_traits.h>
+ 
+ _GLIBCXX_BEGIN_NAMESPACE(std)
+ 
+   /**
+    * @defgroup allocators Allocators
+    * @ingroup memory
+    *
+    * Classes encapsulating memory operations.
+    */
+ 
+diff -N -u -U10 -r c++include.orig/bits/builtin_type_traits.h c++include/bits/builtin_type_traits.h
+--- c++include.orig/bits/builtin_type_traits.h	1970-01-01 01:00:00.000000000 +0100
++++ c++include/bits/builtin_type_traits.h	2013-12-22 01:00:25.000000000 +0100
+@@ -0,0 +1,171 @@
++//
++// bits/builtin_type_traits.h: Compatibility header for gcc-4.2 __is_pod etc.
++// by pts@fazekas.hu at Thu Dec 19 01:59:07 CET 2013
++//
++// Same license as GNU ISO C++ Library.
++//
++// In gcc-4.2 __is_pod is not defined, so we emulate it. In gcc-4.3 and later
++// __is_pod is a build-in, and defining std::__is_pod is a syntax error, so
++// we just don't do anything. In neither is the __is_pod macro defined by
++// default.
++
++#ifndef _BUILTIN_TYPE_TRAITS_H
++#define _BUILTIN_TYPE_TRAITS_H 1
++
++#pragma GCC system_header
++
++#include <bits/c++config.h>
++
++// NB: g++ can not compile these if declared within the class
++// __is_pod itself.
++namespace __gnu_internal
++{
++  typedef char __one;
++  typedef char __two[2];
++
++  template<typename _Tp>
++  __one __test_type(int _Tp::*);
++  template<typename _Tp>
++  __two& __test_type(...);
++} // namespace __gnu_internal
++
++// Defined in bits/cpp_type_traits.h.
++struct __true_type;
++struct __false_type;
++
++_GLIBCXX_BEGIN_NAMESPACE(std)
++
++#ifndef __is_pod
++// Was present in gcc 4.1 and 4.2, but not in 4.3 or 4.4, and it's a compile
++// error there, because __is_pod is a builtin.
++#if defined(__GNUC__) && !defined(__clang__) && (__GNUC__ < 4 || __GNUC__ == 4 && __GNUC_MINOR__ < 3)
++#undef  __is_pod
++#define __is_pod(T) (::std::__is_pod_nb<T>::__value)
++//
++// For the immediate use, the following is a good approximation
++//
++template<typename _Tp>
++  struct __is_pod_nb  // In gcc 4.3 or later __is_pod is a built-in.
++  {
++    enum
++     {
++       __value = (sizeof(__gnu_internal::__test_type<_Tp>(0))
++                  != sizeof(__gnu_internal::__one))
++     };
++  };
++#endif
++#endif
++
++#ifndef __is_empty
++#if defined(__GNUC__) && !defined(__clang__) && (__GNUC__ < 4 || __GNUC__ == 4 && __GNUC_MINOR__ < 3)
++#undef  __is_empty
++#define __is_empty(T) (::std::__is_empty_nb<T>::__value)
++//
++// A stripped-down version of std::tr1::is_empty
++//
++template<typename _Tp>
++  struct __is_empty_nb  // In gcc 4.3 or later __is_empty is a built-in.
++  {
++  private:
++    template<typename>
++      struct __first { };
++    template<typename _Up>
++      struct __second
++      : public _Up { };
++
++  public:
++    enum
++     {
++       __value = sizeof(__first<_Tp>) == sizeof(__second<_Tp>)
++     };
++  };
++#endif
++#endif
++
++// We emulate __has_trivial_destructor as a fallback to __is_scalar.
++#ifndef __has_trivial_destructor
++#if defined(__GNUC__) && !defined(__clang__) && (__GNUC__ < 4 || __GNUC__ == 4 && __GNUC_MINOR__ < 3)
++#undef  __has_trivial_destructor
++#define __has_trivial_destructor(T) (::std::__is_scalar_nb<T>::__value)
++// ::std::__is_scalar is defined in bits/cpp_type_traits.h. We duplicate it
++// here so that we don't have to include.
++template<typename _Tp>struct __is_scalar_nb {
++  enum { __value = 0 };
++  typedef __false_type __type;
++};
++template<typename _Tp>struct __is_scalar_nb<_Tp*> {
++  enum { __value = 1 };
++  typedef __true_type __type;
++};
++template<>struct __is_scalar_nb<bool> {
++  enum { __value = 1 };
++  typedef __true_type __type;
++};
++template<>struct __is_scalar_nb<char> {
++  enum { __value = 1 };
++  typedef __true_type __type;
++};
++template<>struct __is_scalar_nb<signed char> {
++  enum { __value = 1 };
++  typedef __true_type __type;
++};
++template<>struct __is_scalar_nb<unsigned char> {
++  enum { __value = 1 };
++  typedef __true_type __type;
++};
++#ifdef _GLIBCXX_USE_WCHAR_T
++template<>struct __is_scalar_nb<wchar_t> {
++  enum { __value = 1 };
++  typedef __true_type __type;
++};
++#endif
++template<>struct __is_scalar_nb<short> {
++  enum { __value = 1 };
++  typedef __true_type __type;
++};
++template<>struct __is_scalar_nb<unsigned short> {
++  enum { __value = 1 };
++  typedef __true_type __type;
++};
++template<>struct __is_scalar_nb<int> {
++  enum { __value = 1 };
++  typedef __true_type __type;
++};
++template<>struct __is_scalar_nb<unsigned int> {
++  enum { __value = 1 };
++  typedef __true_type __type;
++};
++template<>struct __is_scalar_nb<long> {
++  enum { __value = 1 };
++  typedef __true_type __type;
++};
++template<>struct __is_scalar_nb<unsigned long> {
++  enum { __value = 1 };
++  typedef __true_type __type;
++};
++template<>struct __is_scalar_nb<long long> {
++  enum { __value = 1 };
++  typedef __true_type __type;
++};
++template<>struct __is_scalar_nb<unsigned long long> {
++  enum { __value = 1 };
++  typedef __true_type __type;
++};
++template<>struct __is_scalar_nb<float> {
++  enum { __value = 1 };
++  typedef __true_type __type;
++};
++template<>struct __is_scalar_nb<double> {
++  enum { __value = 1 };
++  typedef __true_type __type;
++};
++template<>struct __is_scalar_nb<long double> {
++  enum { __value = 1 };
++  typedef __true_type __type;
++};
++#endif
++#endif
++
++_GLIBCXX_END_NAMESPACE
++
++#endif //_BUILTIN_TYPE_TRAITS_H
+diff -N -u -U10 -r c++include.orig/bits/c++config.h c++include/bits/c++config.h
+--- c++include.orig/bits/c++config.h	2013-12-18 23:55:19.000000000 +0100
++++ c++include/bits/c++config.h	2013-12-22 01:25:33.000000000 +0100
+@@ -30,21 +30,25 @@
+ 
+ #ifndef _GLIBCXX_CXX_CONFIG_H
+ #define _GLIBCXX_CXX_CONFIG_H 1
+ 
+ // The current version of the C++ library in compressed ISO date format.
+ #define __GLIBCXX__ 20100121 
+ 
+ // Macros for visibility.
+ // _GLIBCXX_HAVE_ATTRIBUTE_VISIBILITY
+ // _GLIBCXX_VISIBILITY_ATTR
++#if defined(__GNUC__) && !defined(__clang__) && (__GNUC__ < 4 || __GNUC__ == 4 && __GNUC_MINOR__ < 2)
++/* g++-4.1.3 doesn't support visibility attributes for namespaces. */
++#else
+ # define _GLIBCXX_HAVE_ATTRIBUTE_VISIBILITY 1
++#endif
+ 
+ #if _GLIBCXX_HAVE_ATTRIBUTE_VISIBILITY
+ # define _GLIBCXX_VISIBILITY_ATTR(V) __attribute__ ((__visibility__ (#V)))
+ #else
+ # define _GLIBCXX_VISIBILITY_ATTR(V) 
+ #endif
+ 
+ // Macros for deprecated.
+ // _GLIBCXX_DEPRECATED
+ // _GLIBCXX_DEPRECATED_ATTR
+@@ -468,20 +472,28 @@
+ /* Define to 1 if you have the `frexpl' function. */
+ /* #undef _GLIBCXX_HAVE_FREXPL */
+ 
+ /* Define if _Unwind_GetIPInfo is available. */
+ #define _GLIBCXX_HAVE_GETIPINFO 1
+ 
+ /* Define if gthr-default.h exists (meaning that threading support is
+    enabled). */
+ #define _GLIBCXX_HAVE_GTHR_DEFAULT 1
+ 
++#if defined(__GNUC__) && !defined(__clang__) && (__GNUC__ < 4 || __GNUC__ == 4 && __GNUC_MINOR__ < 2)
++/* Without this 0, g++-4.1.3 reports: error: weak declaration of
++ * 'int __gthrw_pthread_once(pthread_once_t*, void (*)())' must be public.
++ */
++#undef  _GLIBCXX_GTHREAD_USE_WEAK
++#define _GLIBCXX_GTHREAD_USE_WEAK 0
++#endif
++
+ /* Define to 1 if you have the `hypot' function. */
+ #define _GLIBCXX_HAVE_HYPOT 1
+ 
+ /* Define to 1 if you have the `hypotf' function. */
+ #define _GLIBCXX_HAVE_HYPOTF 1
+ 
+ /* Define to 1 if you have the `hypotl' function. */
+ /* #undef _GLIBCXX_HAVE_HYPOTL */
+ 
+ /* Define if you have the iconv() function. */
+diff -N -u -U10 -r c++include.orig/bits/char_traits.h c++include/bits/char_traits.h
+--- c++include.orig/bits/char_traits.h	2013-12-18 23:55:16.000000000 +0100
++++ c++include/bits/char_traits.h	2013-12-19 02:21:33.000000000 +0100
+@@ -35,20 +35,29 @@
+ 
+ #ifndef _CHAR_TRAITS_H
+ #define _CHAR_TRAITS_H 1
+ 
+ #pragma GCC system_header
+ 
+ #include <bits/stl_algobase.h>  // std::copy, std::fill_n
+ #include <bits/postypes.h>      // For streampos
+ #include <cwchar>               // For WEOF, wmemmove, wmemset, etc.
+ 
++#undef  _GLIBCXX_MEMCHR
++#define _GLIBCXX_MEMCHR 1
++#if defined(__GNUC__) && !defined(__clang__) && (__GNUC__ < 4 || __GNUC__ == 4 && __GNUC_MINOR__ < 3)
++# include <cstring>             // For memchr.
++# define _GLIBCXX_MEMCHR memchr
++#else
++# define _GLIBCXX_MEMCHR __builtin_memchr  /* For use in this header only. */
++#endif
++
+ #ifndef _GLIBCXX_STDIO_MACROS
+ # include <cstdio>              // For EOF
+ # define _CHAR_TRAITS_EOF EOF
+ #else
+ # define _CHAR_TRAITS_EOF (-1)
+ #endif
+ 
+ _GLIBCXX_BEGIN_NAMESPACE(__gnu_cxx)
+ 
+   /**
+@@ -257,21 +266,21 @@
+       static int
+       compare(const char_type* __s1, const char_type* __s2, size_t __n)
+       { return __builtin_memcmp(__s1, __s2, __n); }
+ 
+       static size_t
+       length(const char_type* __s)
+       { return __builtin_strlen(__s); }
+ 
+       static const char_type*
+       find(const char_type* __s, size_t __n, const char_type& __a)
+-      { return static_cast<const char_type*>(__builtin_memchr(__s, __a, __n)); }
++      { return static_cast<const char_type*>(_GLIBCXX_MEMCHR(__s, __a, __n)); }
+ 
+       static char_type*
+       move(char_type* __s1, const char_type* __s2, size_t __n)
+       { return static_cast<char_type*>(__builtin_memmove(__s1, __s2, __n)); }
+ 
+       static char_type*
+       copy(char_type* __s1, const char_type* __s2, size_t __n)
+       { return static_cast<char_type*>(__builtin_memcpy(__s1, __s2, __n)); }
+ 
+       static char_type*
+diff -N -u -U10 -r c++include.orig/bits/shared_ptr.h c++include/bits/shared_ptr.h
+--- c++include.orig/bits/shared_ptr.h	2013-12-18 23:55:16.000000000 +0100
++++ c++include/bits/shared_ptr.h	2014-01-02 13:03:54.195250248 +0100
+@@ -50,20 +50,27 @@
+ #define _SHARED_PTR_H 1
+ 
+ #ifndef __GXX_EXPERIMENTAL_CXX0X__
+ # include <c++0x_warning.h>
+ #endif
+ 
+ #if defined(_GLIBCXX_INCLUDE_AS_TR1)
+ #  error C++0x header cannot be included from TR1 header
+ #endif
+ 
++#include <bits/c++config.h>
++#include <typeinfo>  // The typeid operator is not available without it.
++
++#if !defined(_GLIBCXX_INCLUDE_AS_CXX0X)
++#  error Please #include <memory> instead of <bits/shared_ptr.h>
++#else
++
+ _GLIBCXX_BEGIN_NAMESPACE(std)
+ 
+   /**
+    * @addtogroup pointer_abstractions
+    * @{
+    */
+ 
+   // counted ptr with no deleter or allocator support
+   template<typename _Ptr, _Lock_policy _Lp>
+     class _Sp_counted_ptr
+@@ -1581,11 +1588,13 @@
+     {
+       typedef typename std::remove_const<_Tp>::type _Tp_nc;
+       return allocate_shared<_Tp>(std::allocator<_Tp_nc>(),
+               std::forward<_Args>(__args)...);
+     }
+ 
+   // @} group pointer_abstractions
+ 
+ _GLIBCXX_END_NAMESPACE
+ 
++#endif  // _GLIBCXX_INCLUDE_AS_CXX0X
++
+ #endif // _SHARED_PTR_H
+diff -N -u -U10 -r c++include.orig/bits/stl_algobase.h c++include/bits/stl_algobase.h
+--- c++include.orig/bits/stl_algobase.h	2013-12-18 23:55:16.000000000 +0100
++++ c++include/bits/stl_algobase.h	2013-12-19 02:30:03.000000000 +0100
+@@ -51,20 +51,21 @@
+ 
+ /** @file stl_algobase.h
+  *  This is an internal header file, included by other library headers.
+  *  You should not attempt to use it directly.
+  */
+ 
+ #ifndef _STL_ALGOBASE_H
+ #define _STL_ALGOBASE_H 1
+ 
+ #include <bits/c++config.h>
++#include <bits/builtin_type_traits.h>
+ #include <cstddef>
+ #include <bits/functexcept.h>
+ #include <bits/cpp_type_traits.h>
+ #include <ext/type_traits.h>
+ #include <ext/numeric_traits.h>
+ #include <bits/stl_pair.h>
+ #include <bits/stl_iterator_base_types.h>
+ #include <bits/stl_iterator_base_funcs.h>
+ #include <bits/stl_iterator.h>
+ #include <bits/concept_check.h>
+diff -N -u -U10 -r c++include.orig/bits/stl_construct.h c++include/bits/stl_construct.h
+--- c++include.orig/bits/stl_construct.h	2013-12-18 23:55:16.000000000 +0100
++++ c++include/bits/stl_construct.h	2013-12-19 02:25:22.000000000 +0100
+@@ -50,20 +50,21 @@
+  */
+ 
+ /** @file stl_construct.h
+  *  This is an internal header file, included by other library headers.
+  *  You should not attempt to use it directly.
+  */
+ 
+ #ifndef _STL_CONSTRUCT_H
+ #define _STL_CONSTRUCT_H 1
+ 
++#include <bits/builtin_type_traits.h>
+ #include <new>
+ 
+ _GLIBCXX_BEGIN_NAMESPACE(std)
+ 
+   /**
+    * Constructs an object in existing memory by invoking an allocated
+    * object's constructor with an initializer.
+    */
+   template<typename _T1, typename _T2>
+     inline void
+diff -N -u -U10 -r c++include.orig/bits/stl_deque.h c++include/bits/stl_deque.h
+--- c++include.orig/bits/stl_deque.h	2013-12-18 23:55:16.000000000 +0100
++++ c++include/bits/stl_deque.h	2013-12-19 02:24:43.000000000 +0100
+@@ -50,20 +50,21 @@
+  */
+ 
+ /** @file stl_deque.h
+  *  This is an internal header file, included by other library headers.
+  *  You should not attempt to use it directly.
+  */
+ 
+ #ifndef _STL_DEQUE_H
+ #define _STL_DEQUE_H 1
+ 
++#include <bits/builtin_type_traits.h>
+ #include <bits/concept_check.h>
+ #include <bits/stl_iterator_base_types.h>
+ #include <bits/stl_iterator_base_funcs.h>
+ #include <initializer_list>
+ 
+ _GLIBCXX_BEGIN_NESTED_NAMESPACE(std, _GLIBCXX_STD_D)
+ 
+   /**
+    *  @brief This function controls the size of memory nodes.
+    *  @param  size  The size of an element.
+diff -N -u -U10 -r c++include.orig/bits/stl_tempbuf.h c++include/bits/stl_tempbuf.h
+--- c++include.orig/bits/stl_tempbuf.h	2013-12-18 23:55:16.000000000 +0100
++++ c++include/bits/stl_tempbuf.h	2013-12-19 02:42:38.000000000 +0100
+@@ -50,20 +50,21 @@
+  */
+ 
+ /** @file stl_tempbuf.h
+  *  This is an internal header file, included by other library headers.
+  *  You should not attempt to use it directly.
+  */
+ 
+ #ifndef _STL_TEMPBUF_H
+ #define _STL_TEMPBUF_H 1
+ 
++#include <bits/builtin_type_traits.h>
+ #include <bits/stl_algobase.h>
+ #include <bits/stl_construct.h>
+ #include <bits/stl_uninitialized.h>
+ 
+ _GLIBCXX_BEGIN_NAMESPACE(std)
+ 
+   /**
+    *  @brief Allocates a temporary buffer.
+    *  @param  len  The number of objects of type Tp.
+    *  @return See full description.
+diff -N -u -U10 -r c++include.orig/bits/stl_tree.h c++include/bits/stl_tree.h
+--- c++include.orig/bits/stl_tree.h	2013-12-18 23:55:16.000000000 +0100
++++ c++include/bits/stl_tree.h	2013-12-19 02:42:26.000000000 +0100
+@@ -52,20 +52,21 @@
+  */
+ 
+ /** @file stl_tree.h
+  *  This is an internal header file, included by other library headers.
+  *  You should not attempt to use it directly.
+  */
+ 
+ #ifndef _STL_TREE_H
+ #define _STL_TREE_H 1
+ 
++#include <bits/builtin_type_traits.h>
+ #include <bits/stl_algobase.h>
+ #include <bits/allocator.h>
+ #include <bits/stl_function.h>
+ #include <bits/cpp_type_traits.h>
+ 
+ _GLIBCXX_BEGIN_NAMESPACE(std)
+ 
+   // Red-black tree class, designed for use in implementing STL
+   // associative containers (set, multiset, map, and multimap). The
+   // insertion and deletion algorithms are based on those in Cormen,
+diff -N -u -U10 -r c++include.orig/bits/stl_uninitialized.h c++include/bits/stl_uninitialized.h
+--- c++include.orig/bits/stl_uninitialized.h	2013-12-18 23:55:16.000000000 +0100
++++ c++include/bits/stl_uninitialized.h	2013-12-19 02:30:06.000000000 +0100
+@@ -50,20 +50,22 @@
+  */
+ 
+ /** @file stl_uninitialized.h
+  *  This is an internal header file, included by other library headers.
+  *  You should not attempt to use it directly.
+  */
+ 
+ #ifndef _STL_UNINITIALIZED_H
+ #define _STL_UNINITIALIZED_H 1
+ 
++#include <bits/builtin_type_traits.h>
++
+ _GLIBCXX_BEGIN_NAMESPACE(std)
+ 
+   template<bool>
+     struct __uninitialized_copy
+     {
+       template<typename _InputIterator, typename _ForwardIterator>
+         static _ForwardIterator
+         uninitialized_copy(_InputIterator __first, _InputIterator __last,
+ 			   _ForwardIterator __result)
+         {
+diff -N -u -U10 -r c++include.orig/bits/valarray_array.h c++include/bits/valarray_array.h
+--- c++include.orig/bits/valarray_array.h	2013-12-18 23:55:17.000000000 +0100
++++ c++include/bits/valarray_array.h	2013-12-19 02:43:10.000000000 +0100
+@@ -30,20 +30,21 @@
+  */
+ 
+ // Written by Gabriel Dos Reis <Gabriel.Dos-Reis@DPTMaths.ENS-Cachan.Fr>
+ 
+ #ifndef _VALARRAY_ARRAY_H
+ #define _VALARRAY_ARRAY_H 1
+ 
+ #pragma GCC system_header
+ 
+ #include <bits/c++config.h>
++#include <bits/builtin_type_traits.h>
+ #include <bits/cpp_type_traits.h>
+ #include <cstdlib>
+ #include <new>
+ 
+ _GLIBCXX_BEGIN_NAMESPACE(std)
+ 
+   //
+   // Helper functions on raw pointers
+   //
+ 
+diff -N -u -U10 -r c++include.orig/complex.h c++include/complex.h
+--- c++include.orig/complex.h	2013-12-18 23:55:19.000000000 +0100
++++ c++include/complex.h	2013-12-20 13:56:12.000000000 +0100
+@@ -19,24 +19,27 @@
+ 
+ // You should have received a copy of the GNU General Public License and
+ // a copy of the GCC Runtime Library Exception along with this program;
+ // see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+ // <http://www.gnu.org/licenses/>.
+ 
+ /** @file complex.h
+  *  This is a Standard C++ Library header.
+  */
+ 
+-#include <bits/c++config.h>
++#ifndef _GLIBCXX_COMPLEX_H
++#define _GLIBCXX_COMPLEX_H 1
+ 
++#ifdef __cplusplus
++#include <bits/c++config.h>
+ #ifdef __GXX_EXPERIMENTAL_CXX0X__
+ # include <ccomplex>
+ #else
+ # if _GLIBCXX_HAVE_COMPLEX_H
+ #  include_next <complex.h>
+ # endif
+ #endif
+-
+-#ifndef _GLIBCXX_COMPLEX_H
+-#define _GLIBCXX_COMPLEX_H 1
++#else
++#include_next <complex.h>  /* Include the C complex.h header. */
++#endif
+ 
+ #endif
+diff -N -u -U10 -r c++include.orig/debug/formatter.h c++include/debug/formatter.h
+--- c++include.orig/debug/formatter.h	2013-12-18 23:55:19.000000000 +0100
++++ c++include/debug/formatter.h	2014-01-02 12:47:46.625512242 +0100
+@@ -24,20 +24,22 @@
+ 
+ /** @file debug/formatter.h
+  *  This file is a GNU debug extension to the Standard C++ Library.
+  */
+ 
+ #ifndef _GLIBCXX_DEBUG_FORMATTER_H
+ #define _GLIBCXX_DEBUG_FORMATTER_H 1
+ 
+ #include <typeinfo>
+ #include <debug/debug.h>
++#include <debug/functions.h>  // __gnu_debug::__check_singular.
++#include <stddef.h>  // size_t.
+ 
+ namespace __gnu_debug
+ {
+   using std::type_info;
+ 
+   /** Determine if the two types are the same. */
+   template<typename _Type1, typename _Type2>
+     struct __is_same
+     {
+       static const bool value = false;
+diff -N -u -U10 -r c++include.orig/exception_ptr.h c++include/exception_ptr.h
+--- c++include.orig/exception_ptr.h	2013-12-18 23:55:19.000000000 +0100
++++ c++include/exception_ptr.h	2014-01-02 12:38:44.133664946 +0100
+@@ -37,20 +37,22 @@
+ #include <exception_defines.h>
+ 
+ #if !defined(_GLIBCXX_ATOMIC_BUILTINS_4)
+ #  error This platform does not support exception propagation.
+ #endif
+ 
+ extern "C++" {
+ 
+ namespace std 
+ {
++  class type_info;
++
+   /**
+    * @addtogroup exceptions
+    * @{
+    */
+ 
+   // Hide the free operators from other types
+   namespace __exception_ptr
+   {
+     /**
+      * @brief An opaque pointer to an arbitrary exception.
+diff -N -u -U10 -r c++include.orig/fenv.h c++include/fenv.h
+--- c++include.orig/fenv.h	2013-12-18 23:55:19.000000000 +0100
++++ c++include/fenv.h	2013-12-20 13:47:38.000000000 +0100
+@@ -22,20 +22,22 @@
+ // see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+ // <http://www.gnu.org/licenses/>.
+ 
+ /** @file fenv.h
+  *  This is a Standard C++ Library header.
+  */
+ 
+ #ifndef _GLIBCXX_FENV_H
+ #define _GLIBCXX_FENV_H 1
+ 
++#ifdef __cplusplus
++
+ #pragma GCC system_header
+ 
+ #include <bits/c++config.h>
+ #if _GLIBCXX_HAVE_FENV_H
+ # include_next <fenv.h>
+ #endif
+ 
+ #ifdef __GXX_EXPERIMENTAL_CXX0X__
+ #  if defined(_GLIBCXX_INCLUDE_AS_TR1)
+ #    error C++0x header cannot be included from TR1 header
+@@ -48,11 +50,15 @@
+ #    define _GLIBCXX_END_NAMESPACE_TR1
+ #    define _GLIBCXX_TR1
+ #    include <tr1_impl/cfenv>
+ #    undef _GLIBCXX_TR1
+ #    undef _GLIBCXX_END_NAMESPACE_TR1
+ #    undef _GLIBCXX_BEGIN_NAMESPACE_TR1
+ #    undef _GLIBCXX_INCLUDE_AS_CXX0X
+ #  endif
+ #endif
+ 
++#else
++#include_next <fenv.h>  /* Include the C fenv.h header. */
++#endif
++
+ #endif // _GLIBCXX_FENV_H
+diff -N -u -U10 -r c++include.orig/limits c++include/limits
+--- c++include.orig/limits	2013-12-18 23:55:19.000000000 +0100
++++ c++include/limits	2013-12-22 01:15:46.000000000 +0100
+@@ -1096,22 +1096,27 @@
+       { return 0.5F; }
+ 
+       static const int min_exponent = __FLT_MIN_EXP__;
+       static const int min_exponent10 = __FLT_MIN_10_EXP__;
+       static const int max_exponent = __FLT_MAX_EXP__;
+       static const int max_exponent10 = __FLT_MAX_10_EXP__;
+ 
+       static const bool has_infinity = __FLT_HAS_INFINITY__;
+       static const bool has_quiet_NaN = __FLT_HAS_QUIET_NAN__;
+       static const bool has_signaling_NaN = has_quiet_NaN;
+-      static const float_denorm_style has_denorm
+-	= bool(__FLT_HAS_DENORM__) ? denorm_present : denorm_absent;
++      static const float_denorm_style has_denorm =
++#ifdef __FLT_HAS_DENORM__  /* Defined in g++-4.2 and clang-3.0. */
++	bool(__FLT_HAS_DENORM__) ? denorm_present :
++#else
++	bool(__FLT_DENORM_MIN__) ? denorm_present :  /* g++-4.1.3. */
++#endif
++        denorm_absent;
+       static const bool has_denorm_loss = __glibcxx_float_has_denorm_loss;
+ 
+       static float infinity() throw()
+       { return __builtin_huge_valf (); }
+       static float quiet_NaN() throw()
+       { return __builtin_nanf (""); }
+       static float signaling_NaN() throw()
+       { return __builtin_nansf (""); }
+       static float denorm_min() throw()
+       { return __FLT_DENORM_MIN__; }
+@@ -1153,22 +1158,27 @@
+       { return 0.5; }
+ 
+       static const int min_exponent = __DBL_MIN_EXP__;
+       static const int min_exponent10 = __DBL_MIN_10_EXP__;
+       static const int max_exponent = __DBL_MAX_EXP__;
+       static const int max_exponent10 = __DBL_MAX_10_EXP__;
+ 
+       static const bool has_infinity = __DBL_HAS_INFINITY__;
+       static const bool has_quiet_NaN = __DBL_HAS_QUIET_NAN__;
+       static const bool has_signaling_NaN = has_quiet_NaN;
+-      static const float_denorm_style has_denorm
+-	= bool(__DBL_HAS_DENORM__) ? denorm_present : denorm_absent;
++      static const float_denorm_style has_denorm =
++#ifdef __DBL_HAS_DENORM__  /* Defined in g++-4.2 and clang-3.0. */
++	bool(__DBL_HAS_DENORM__) ? denorm_present :
++#else
++	bool(__DBL_DENORM_MIN__) ? denorm_present :  /* g++-4.1.3. */
++#endif
++        denorm_absent;
+       static const bool has_denorm_loss = __glibcxx_double_has_denorm_loss;
+ 
+       static double infinity() throw()
+       { return __builtin_huge_val(); }
+       static double quiet_NaN() throw()
+       { return __builtin_nan (""); }
+       static double signaling_NaN() throw()
+       { return __builtin_nans (""); }
+       static double denorm_min() throw()
+       { return __DBL_DENORM_MIN__; }
+@@ -1210,22 +1220,25 @@
+       { return 0.5L; }
+ 
+       static const int min_exponent = __LDBL_MIN_EXP__;
+       static const int min_exponent10 = __LDBL_MIN_10_EXP__;
+       static const int max_exponent = __LDBL_MAX_EXP__;
+       static const int max_exponent10 = __LDBL_MAX_10_EXP__;
+ 
+       static const bool has_infinity = __LDBL_HAS_INFINITY__;
+       static const bool has_quiet_NaN = __LDBL_HAS_QUIET_NAN__;
+       static const bool has_signaling_NaN = has_quiet_NaN;
+-      static const float_denorm_style has_denorm
+-	= bool(__LDBL_HAS_DENORM__) ? denorm_present : denorm_absent;
++      static const float_denorm_style has_denorm =
++#ifdef __LDBL_HAS_DENORM__  /* Defined in g++-4.2 and clang-3.0. */
++	bool(__LDBL_HAS_DENORM__) ? denorm_present :
++#endif
++        denorm_absent;  /* g++-4.1.3 default. */
+       static const bool has_denorm_loss
+ 	= __glibcxx_long_double_has_denorm_loss;
+ 
+       static long double infinity() throw()
+       { return __builtin_huge_vall (); }
+       static long double quiet_NaN() throw()
+       { return __builtin_nanl (""); }
+       static long double signaling_NaN() throw()
+       { return __builtin_nansl (""); }
+       static long double denorm_min() throw()
+diff -N -u -U10 -r c++include.orig/tgmath.h c++include/tgmath.h
+--- c++include.orig/tgmath.h	2013-12-18 23:55:19.000000000 +0100
++++ c++include/tgmath.h	2013-12-20 13:56:21.000000000 +0100
+@@ -19,24 +19,27 @@
+ 
+ // You should have received a copy of the GNU General Public License and
+ // a copy of the GCC Runtime Library Exception along with this program;
+ // see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+ // <http://www.gnu.org/licenses/>.
+ 
+ /** @file tgmath.h
+  *  This is a Standard C++ Library header.
+  */
+ 
+-#include <bits/c++config.h>
++#ifndef _GLIBCXX_TGMATH_H
++#define _GLIBCXX_TGMATH_H 1
+ 
++#ifdef __cplusplus
++#include <bits/c++config.h>
+ #ifdef __GXX_EXPERIMENTAL_CXX0X__
+ # include <ctgmath>
+ #else
+ # if _GLIBCXX_HAVE_TGMATH_H
+ #  include_next <tgmath.h>
+ # endif
+ #endif
+-
+-#ifndef _GLIBCXX_TGMATH_H
+-#define _GLIBCXX_TGMATH_H 1
++#else
++#include_next <tgmath.h>  /* Include the C tgmath.h header. */
++#endif
+ 
+ #endif
+diff -N -u -U10 -r c++include.orig/tr1/shared_ptr.h c++include/tr1/shared_ptr.h
+--- c++include.orig/tr1/shared_ptr.h	2013-12-18 23:55:18.000000000 +0100
++++ c++include/tr1/shared_ptr.h	2014-01-02 12:53:34.899698573 +0100
+@@ -46,20 +46,24 @@
+  *  You should not attempt to use it directly.
+  */
+ 
+ #ifndef _TR1_SHARED_PTR_H
+ #define _TR1_SHARED_PTR_H 1
+ 
+ #if defined(_GLIBCXX_INCLUDE_AS_CXX0X)
+ #  error TR1 header cannot be included from C++0x header
+ #endif
+ 
++#if !defined(_GLIBCXX_INCLUDE_AS_TR1)
++#  error Please #include <tr1/memory> instead of <tr1/shared_ptr.h>
++#else
++
+ namespace std
+ {
+ namespace tr1
+ {
+ 
+   template<typename _Ptr, typename _Deleter, _Lock_policy _Lp>
+     class _Sp_counted_base_impl
+     : public _Sp_counted_base<_Lp>
+     {
+     public:
+@@ -1010,11 +1014,13 @@
+ 	  if (__pe != 0)
+ 	    __pe->_M_weak_assign(const_cast<_Tp1*>(__px), __pn);
+ 	}
+ 
+       mutable weak_ptr<_Tp>  _M_weak_this;
+     };
+ 
+ }
+ }
+ 
++#endif  // _GLIBCXX_INCLUDE_AS_TR1
++
+ #endif // _TR1_SHARED_PTR_H
+diff -N -u -U10 -r c++include.orig/tr1/type_traits c++include/tr1/type_traits
+--- c++include.orig/tr1/type_traits	2013-12-18 23:55:19.000000000 +0100
++++ c++include/tr1/type_traits	2013-12-19 02:43:06.000000000 +0100
+@@ -28,20 +28,21 @@
+ 
+ #ifndef _GLIBCXX_TR1_TYPE_TRAITS
+ #define _GLIBCXX_TR1_TYPE_TRAITS 1
+ 
+ #pragma GCC system_header
+ 
+ #if defined(_GLIBCXX_INCLUDE_AS_CXX0X)
+ #  error TR1 header cannot be included from C++0x header
+ #endif
+ 
++#include <bits/builtin_type_traits.h>
+ #include <cstddef>
+ 
+ #if defined(_GLIBCXX_INCLUDE_AS_TR1)
+ #  include <tr1_impl/type_traits>
+ #else
+ #  define _GLIBCXX_INCLUDE_AS_TR1
+ #  define _GLIBCXX_BEGIN_NAMESPACE_TR1 namespace tr1 {
+ #  define _GLIBCXX_END_NAMESPACE_TR1 }
+ #  define _GLIBCXX_TR1 tr1::
+ #  include <tr1_impl/type_traits>
+diff -N -u -U10 -r c++include.orig/tr1_impl/type_traits c++include/tr1_impl/type_traits
+--- c++include.orig/tr1_impl/type_traits	2013-12-18 23:55:19.000000000 +0100
++++ c++include/tr1_impl/type_traits	2013-12-19 02:27:21.000000000 +0100
+@@ -20,20 +20,22 @@
+ // You should have received a copy of the GNU General Public License and
+ // a copy of the GCC Runtime Library Exception along with this program;
+ // see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+ // <http://www.gnu.org/licenses/>.
+ 
+ /** @file tr1_impl/type_traits
+ *  This is an internal header file, included by other library headers.
+ *  You should not attempt to use it directly.
+ */
+ 
++#include <bits/builtin_type_traits.h>
++
+ namespace std
+ {
+ _GLIBCXX_BEGIN_NAMESPACE_TR1
+ 
+   /**
+    * @defgroup metaprogramming Type Traits
+    * @ingroup utilities
+    *
+    * Compile time type transformation and information.
+    * @{
+diff -N -u -U10 -r c++include.orig/type_traits c++include/type_traits
+--- c++include.orig/type_traits	2013-12-18 23:55:19.000000000 +0100
++++ c++include/type_traits	2013-12-19 02:26:17.000000000 +0100
+@@ -32,20 +32,21 @@
+ #pragma GCC system_header
+ 
+ #ifndef __GXX_EXPERIMENTAL_CXX0X__
+ # include <c++0x_warning.h>
+ #else
+ 
+ #if defined(_GLIBCXX_INCLUDE_AS_TR1)
+ #  error C++0x header cannot be included from TR1 header
+ #endif
+ 
++#include <bits/builtin_type_traits.h>
+ #include <cstddef>
+ 
+ #if defined(_GLIBCXX_INCLUDE_AS_CXX0X)
+ #  include <tr1_impl/type_traits>
+ #else
+ #  define _GLIBCXX_INCLUDE_AS_CXX0X
+ #  define _GLIBCXX_BEGIN_NAMESPACE_TR1
+ #  define _GLIBCXX_END_NAMESPACE_TR1
+ #  define _GLIBCXX_TR1
+ #  include <tr1_impl/type_traits>
