@@ -257,22 +257,31 @@ Compatibility and feature notes
   instead, which is always available, and as a side effect it makes
   __is_pod, __is_empty and __has_trivial_destructor available.
 
-Possible problems with static linking
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-* `gcc -static' gives you a false sense of portability, because for calls
-  such as getpwent(3) (getting info of Unix system users) and
-  gethostbyname(3) (DNS resolution), glibc loads files such as
-  libnss_compat.so, libnss_dns.so. On the target system those libraries may
-  be incompatible with your binary, so you may get a segfault or unintended
-  behavior. pts-xstatic solves this, because it uses uClibc.
+Does pts-xstatic create portable executables?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+pts-xstatic creates portable, statically linked, Linux ELF i386 executables,
+linked against uClibc. By default, these executables don't need any external
+file (not even the file specified by argv[0], not even the /proc filesystem)
+to run. NSS libraries (the code needed for e.g. getpwent(3) (getting info of
+Unix system users) and gethostbyname(3) (DNS resolution)) are also included.
+The executables also work on FreeBSD in Linux mode if the operating system
+field in the ELF header frm SYSV to Linux.
 
-* It may make sense to embed locale files, gconv libraries, arbitrary data
-  and configuration files needed by the program, Neither `gcc -static',
-  pts-xstatic or statifier (http://statifier.sf.net/) can do it, but Ermine
-  can. It's not free software, but you can get a free-of-charge time-limited
-  trial, and you can ask for a discount for noncommercial use.
-  See all details at http://www.magicermine.com/products.html , and give it
-  a try!
+As an alternative to pts-xstatic: `gcc -static' (or `clang -static') doesn't
+provide real portability, because for calls such as getpwent(3) (getting
+info of Unix system users) and gethostbyname(3) (DNS resolution), glibc
+loads files such as libnss_compat.so, libnss_dns.so. On the target system
+those libraries may be incompatible with your binary, so you may get a
+segfault or unintended behavior. pts-xstatic solves this, because it uses
+uClibc.
+
+It can be useful to embed locale files, gconv libraries, arbitrary data and
+configuration files needed by the program, Neither `gcc -static',
+pts-xstatic or statifier (http://statifier.sf.net/) can do it, but Ermine
+can. Ermine is not free software, but you can get a free-of-charge
+time-limited trial, and you can ask for a discount for noncommercial use.
+See all details at http://www.magicermine.com/products.html , and give it a
+try!
 
 Author, copyright and recompilation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
