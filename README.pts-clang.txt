@@ -305,6 +305,6 @@ portable clang.bin binary was created from the official Clang binary release
 
 If you want to create portable Linux executables (and you don't care too
 much about file size), give Ermine a try! It's the most comfortable,
-easy-to-use, and comprehensive tool avaialble.
+easy-to-use, and comprehensive tool available.
 
 __EOF__
