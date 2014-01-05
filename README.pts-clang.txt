@@ -160,6 +160,8 @@ http://llvm.org/releases/3.3/clang+llvm-3.3-i386-debian6.tar.bz2
   executable creator: it takes a dynamically linked ELF executable, discovers
   its dependencies (e.g. dynamic libraries, NSS libaries), and builds a
   protable, statically linked ELF executable containing all the dependencies.
+  See the features, licensing information and get Ermine from
+  http://www.magicermine.com/products.html .
   The result can be even more portable than -xstatic, because Ermine can pack
   locale files, gconv libraries etc. Not all the packing is automatic: use
   -xermine,... to specify packing flags to Ermine.
