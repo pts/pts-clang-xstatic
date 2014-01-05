@@ -1,0 +1,36 @@
+#!/bin/sh
+#
+# mktrampolines: build the static clang and xstatic trampolines
+# by pts@fazekas.hu at Thu Dec 26 17:45:15 CET 2013
+#
+# Run this script on an i386 or amd64 Linux.
+#
+# Here is how lib0.a was created from dietlibc.a in dietlibc-0.33
+#
+# $ rm -f ../lib0.a &&
+#   ar cr ../lib0.a strcmp.o execv.o malloc.o free.o realloc.o stat.o exit.o \
+#   strcpy.o lstat.o strdup.o strcat.o write.o strstr.o strncmp.o readlink.o \
+#   strchr.o getenv.o __uClibc_main.o abort.o _exit.o sigaction.o memcpy.o \
+#   __syscall_rt_sigaction.o __errno_location.o errno.o memset.o sigsetops.o \
+#   raise.o kill.o getpid.o sigprocmask.o getegid.o getgid.o geteuid.o \
+#   getuid.o dl-support.o open.o __syscall_fcntl.o __syscall_fcntl64.o \
+#   memcmp.o strlen.o mremap.o xstatconv.o munmap.o sysconf.o getpagesize.o \
+#   getdtablesize.o getrlimit.o clock_getres.o sbrk.o execve.o brk.o mmap.o \
+#   __syscall_error.o uname.o close.o read.o waitpid.o fork.o wait4.o
+
+set -ex
+
+test -f dietlibc/lib0.a
+test -f dietlibc/start.o
+test -f dietlibc/miniinc.h
+CFLAGS='-m32 -fno-stack-protector -fomit-frame-pointer -mpreferred-stack-boundary=2 -falign-functions=1 -falign-jumps=1 -falign-loops=1 -Os -W -Wall -Werror=implicit -Werror=implicit-int -Werror=implicit-function-declaration --sysroot dietlibc -isystem dietlibc -static-libgcc -DUSE_MINIINC'
+LDFLAGS1='-nostdlib -m elf_i386 -static -s dietlibc/start.o'
+LDFLAGS2='dietlibc/lib0.a'
+
+gcc $CFLAGS -c xstatic.c
+ld -o xstatic $LDFLAGS1 xstatic.o $LDFLAGS2
+gcc $CFLAGS -c clang_trampoline.c
+ld -o clang $LDFLAGS1 clang_trampoline.o $LDFLAGS2
+ls -l xstatic clang
+
+: mktrampolines OK.
