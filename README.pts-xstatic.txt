@@ -77,7 +77,7 @@ $ ls -l a.big
 
 Dependencies
 ~~~~~~~~~~~~
-The dependencies of pts-clang are the following:
+The dependencies of pts-xstatic are the following:
 
 * A Linux i386 or Linux amd64 host system.
 
