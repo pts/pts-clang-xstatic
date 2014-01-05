@@ -20,6 +20,11 @@ http://ptspts.blogspot.hu/2009/11/tiny-self-contained-c-compiler-using.html
 . With pts-xstatic, you can create faster and smaller statically linked
 executables, with the compiler of your choice.
 
+As an alternative for pts-xstatic and uClibc, see diet libc
+(http://www.fefe.de/dietlibc/) and its diet tool (which is an
+alternative of the xstatic tool), with which you can create even
+smaller binaries.
+
 Motivation
 ~~~~~~~~~~
 0. Available uClibc GCC toolchain binary releases are very old:
