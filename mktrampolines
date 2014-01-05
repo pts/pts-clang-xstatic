@@ -7,7 +7,8 @@
 #
 # Here is how lib0.a was created from libc.a in uClibc-0.9.30.1:
 #
-# $ ar cr ../lib0.a strcmp.o execv.o malloc.o free.o realloc.o stat.o exit.o \
+# $ rm -f ../lib0.a &&
+#   ar cr ../lib0.a strcmp.o execv.o malloc.o free.o realloc.o stat.o exit.o \
 #   strcpy.o lstat.o strdup.o strcat.o write.o strstr.o strncmp.o readlink.o \
 #   strchr.o getenv.o __uClibc_main.o abort.o _exit.o sigaction.o memcpy.o \
 #   __syscall_rt_sigaction.o __errno_location.o errno.o memset.o sigsetops.o \
@@ -16,6 +17,7 @@
 #   memcmp.o strlen.o mremap.o xstatconv.o munmap.o sysconf.o getpagesize.o \
 #   getdtablesize.o getrlimit.o clock_getres.o sbrk.o execve.o brk.o mmap.o \
 #   __syscall_error.o uname.o close.o read.o waitpid.o fork.o wait4.o unlink.o
+#
 
 set -ex
 
