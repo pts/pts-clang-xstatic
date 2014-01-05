@@ -5,7 +5,7 @@
 #
 # Run this script on an i386 or amd64 Linux.
 #
-# Here is how lib0. was created from libc.a in uClibc-0.9.30.1:
+# Here is how lib0.a was created from libc.a in uClibc-0.9.30.1:
 #
 # $ ar cr ../lib0.a strcmp.o execv.o malloc.o free.o realloc.o stat.o exit.o \
 #   strcpy.o lstat.o strdup.o strcat.o write.o strstr.o strncmp.o readlink.o \
@@ -15,14 +15,14 @@
 #   getuid.o dl-support.o open.o __syscall_fcntl.o __syscall_fcntl64.o \
 #   memcmp.o strlen.o mremap.o xstatconv.o munmap.o sysconf.o getpagesize.o \
 #   getdtablesize.o getrlimit.o clock_getres.o sbrk.o execve.o brk.o mmap.o \
-#   __syscall_error.o uname.o close.o read.o waitpid.o fork.o wait4.o
+#   __syscall_error.o uname.o close.o read.o waitpid.o fork.o wait4.o unlink.o
 
 set -ex
 
 test -f minilibc/lib0.a
 test -f minilibc/crt1.o
 test -f minilibc/miniinc.h
-CFLAGS='-m32 -fno-stack-protector -fomit-frame-pointer -Os -W -Wall -Werror=implicit -Werror=implicit-int -Werror=implicit-function-declaration --sysroot minilibc -isystem minilibc -static-libgcc -DUSE_MINIINC'
+CFLAGS='-m32 -fno-stack-protector -fomit-frame-pointer -mpreferred-stack-boundary=2 -falign-functions=1 -falign-jumps=1 -falign-loops=1  -Os -W -Wall -Werror=implicit -Werror=implicit-int -Werror=implicit-function-declaration --sysroot minilibc -isystem minilibc -static-libgcc -DUSE_MINIINC'
 LDFLAGS1='-nostdlib -m elf_i386 -static -s minilibc/crt1.o minilibc/crti.o minilibc/crtbeginT.o'
 LDFLAGS2='minilibc/lib0.a minilibc/crtend.o minilibc/crtn.o'
 
