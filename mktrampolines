@@ -27,11 +27,14 @@ test -f minilibc/miniinc.h
 CFLAGS='-m32 -fno-stack-protector -fomit-frame-pointer -mpreferred-stack-boundary=2 -falign-functions=1 -falign-jumps=1 -falign-loops=1  -Os -W -Wall -Werror=implicit -Werror=implicit-int -Werror=implicit-function-declaration --sysroot minilibc -isystem minilibc -static-libgcc -DUSE_MINIINC'
 LDFLAGS1='-nostdlib -m elf_i386 -static -s minilibc/crt1.o minilibc/crti.o minilibc/crtbeginT.o'
 LDFLAGS2='minilibc/lib0.a minilibc/crtend.o minilibc/crtn.o'
+STRIP='strip -S --strip-unneeded --remove-section=.note.gnu.gold-version --remove-section=.comment --remove-section=.note --remove-section=.note.gnu.build-id'
 
 gcc $CFLAGS -c xstatic.c
 ld -o xstatic $LDFLAGS1 xstatic.o $LDFLAGS2
+$STRIP xstatic
 gcc $CFLAGS -c clang_trampoline.c
 ld -o clang $LDFLAGS1 clang_trampoline.o $LDFLAGS2
+$STRIP clang
 ls -l xstatic clang
 
 : mktrampolines OK.
