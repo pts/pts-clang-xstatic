@@ -1,7 +1,7 @@
 README for the pts-xstatic Linux i386 uClibc static compilation tool
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 pts-xstatic is a convenient wrapper tool for compiling and creating
-portable, statically linked Linux i386 binaries. It works on Linux i386 and
+portable, statically linked Linux i386 executables. It works on Linux i386 and
 Linux x86_64 host systems. It wraps an existing
 compiler (GCC or Clang) of your choice, and it links against uClibc and the
 other base libraries included in the pts-xstatic binary release.
