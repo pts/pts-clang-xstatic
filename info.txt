@@ -75,14 +75,20 @@ Developer info:
   $ rm -f pts-static-binu-latest.sfx.7z && time 7z a -t7z -mx=7 -md=8m -ms=on -sfx../../../../../../../../"$PWD"/7z9.22LinuxI386ConTiny.sfx pts-static-binu-latest.sfx.7z pts-static-binu
   $ chmod 755 *.sfz.7z
 
-TODOs for the current release:
-
-* TODO(pts): Create .7z for old and new uclibc libstdc++.
-* TODO(pts): Create downloads, remove backup files.
-* TODO(pts): Advertise Ermine on the blog.
+* `diet' needs explicit -m32.
+* `diet -v g++ ...' seems to work, but it doesn't print the g++ command-line
+  `diet -v gcc ...' prints the gcc command-line.
+* dietlibc start.o supports constructors and destructors, just like uClibc
+* `diet gcc ...' doesn't run any constructors or destructors (not even gcc
+  __attribute__((constructor)):
+  .../dietlibc-0.33/bin-i386/diet -v gcc -m32 -W -Wall -s -O2 cons.c && ./a.out >cons.out
 
 TODOs for new features:
 
+* TODO(pts): Add dietlibc support.
+* TODO(pts): Add dietlibc C++ compilation support.
+* TODO(pts): add __uclibc__; dietlibc adds -D__dietlibc__ (uClibc doesn't
+             add anything, musl doesn't add anything)
 * TODO(pts): Document how libstdc++ was compiled.
 * TODO(pts): Is LTO (link-time-optimization) enabled in gold by default? If
              not, how to enable it?
