@@ -20,21 +20,44 @@ set -ex
 : OUT="$OUT"
 type patchelf.static
 type perl
+#type python  # Needed for ./mklibs.
 type sha1sum
-type mklibs
 type ErmineLight.i386
-test -f inlib.sfx.7z
-test -x inlib.sfx.7z
+test -f mklibs
 
 SHA1="$(sha1sum <"$IN")"
 # /tmp/clang+llvm-3.3-i386-debian6/bin/clang
-test "$SHA1" = 'a3d229822f724a883ac23a7d490056e3fa4fd2d6  -'
+case "$SHA1" in
+ '22cbeb63aa1fa6ff1024f8b0979b1eb19c608602  -')  # clang+llvm-3.0-i386-linux-debian/bin/clang
+  INLIB=inlib30
+  ;;
+ '1f01c54a7c8cb90c4582eb52d0b30a0a3a0952dc  -')  # clang+llvm-3.1-x86-linux-ubuntu-11.10/bin/clang
+  INLIB=inlib30
+  ;;
+ '69ae917e816512d67d0cce47710b4bf3239f5f77  -')  # clang+llvm-3.2-x86-linux-ubuntu-12.04/bin/clang
+  INLIB=inlib34
+  ;;
+ 'a3d229822f724a883ac23a7d490056e3fa4fd2d6  -')  # clang+llvm-3.3-i386-debian6/bin/clang
+  INLIB=inlib30
+  ;;
+ 'f5710755488345cee92a31b7d1e20d58055f9a60  -')  # clang+llvm-3.4-i686-fedora19/bin/clang
+  INLIB=inlib34
+  ;;
+ *) echo "unknown clang binary"; exit 1
+esac
 
-rm -rf inlib
-./inlib.sfx.7z -y
+test -f "$INLIB".sfx.7z
+test -x "$INLIB".sfx.7z
+rm -rf inlib "$INLIB"
+# Created with: rm -f inlib33.sfx.7z && time 7z a -t7z -mx=7 -md=8m -ms=on -sfx../../../../../../../../../../"$PWD"/7z9.22LinuxI386ConTiny.sfx inlib33.sfx.7z inlib33 && chmod 755 inlib33.sfx.7z
+./"$INLIB".sfx.7z -y
+#cp -a "$INLIB" inlib
+mv "$INLIB" inlib
 test -f inlib/libc.so.6
 test -f inlib/libc_pic.a
 test -f inlib/libc_pic.map
+test -f inlib/soinit.o
+test -f inlib/sofini.o
 
 rm -f "$OUT.tmp1"
 <"$IN" >"$OUT.tmp1" cat
@@ -51,13 +74,16 @@ cp -a inlib/ld-linux.so.2 "$INTERP"
 chmod +x "$OUT.tmp1"
 rm -rf destlib
 mkdir destlib
-mklibs -D -L inlib -d destlib --ldlib inlib/ld-linux.so.2 clang.bin.tmp1
+# SUXX: memcpy and about 54 functions are supplied as `i' (implicit) relocations, which mklibs does not support
+./mklibs --sysroot ./ -D -L inlib -d destlib --ldlib inlib/ld-linux.so.2 clang.bin.tmp1
+# Alternative to mklibs: cp -a inlib/* destlib/
 # If the --set-interpereter value was not an absolute path, Ermine wouldn't
 # embed it.
 ErmineLight.i386 -l destlib -o "$OUT".tmp2 "$OUT".tmp1
 # To get argv[0] right. Otherwise Clang reads it from /proc/self/exe.
 <"$OUT.tmp2" >"$OUT" perl -0777 \
     -pe'die if !s@\0/proc/self/exe\0@\0/proc/self/exE\0@'
+chmod 755 "$OUT"
 rm -rf inlib destlib "$OUT.tmp1" "$OUT.tmp2"
 ls -l "$OUT"
 : mkclangbin OK.
