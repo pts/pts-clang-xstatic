@@ -29,16 +29,16 @@ SHA1="$(sha1sum <"$IN")"
 # /tmp/clang+llvm-3.3-i386-debian6/bin/clang
 case "$SHA1" in
  '22cbeb63aa1fa6ff1024f8b0979b1eb19c608602  -')  # clang+llvm-3.0-i386-linux-debian/bin/clang
-  INLIB=inlib30
+  INLIB=inlib33
   ;;
  '1f01c54a7c8cb90c4582eb52d0b30a0a3a0952dc  -')  # clang+llvm-3.1-x86-linux-ubuntu-11.10/bin/clang
-  INLIB=inlib30
+  INLIB=inlib33
   ;;
  '69ae917e816512d67d0cce47710b4bf3239f5f77  -')  # clang+llvm-3.2-x86-linux-ubuntu-12.04/bin/clang
   INLIB=inlib34
   ;;
  'a3d229822f724a883ac23a7d490056e3fa4fd2d6  -')  # clang+llvm-3.3-i386-debian6/bin/clang
-  INLIB=inlib30
+  INLIB=inlib33
   ;;
  'f5710755488345cee92a31b7d1e20d58055f9a60  -')  # clang+llvm-3.4-i686-fedora19/bin/clang
   INLIB=inlib34
