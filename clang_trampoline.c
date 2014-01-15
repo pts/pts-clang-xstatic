@@ -608,7 +608,9 @@ typedef enum ldmode_t {
 } ldmode_t;
 
 int main(int argc, char **argv) {
-  char *prog, *argv0;
+  char *argv0;
+  char *argv0_base;  /* The basename of argv[0], after following symlinks. */
+  char *version_suffix;
   char *dir, *dirup;
   char *p;
   char **args, **argp;
@@ -625,8 +627,11 @@ int main(int argc, char **argv) {
   dir = readlink_alloc_all(dir);
   for (p = dir + strlen(dir); p != dir && p[-1] != '/'; --p) {}
   if (p == dir) {
-    strcpy(dir, ".");
+    dir = strdupcat("./", dir, "");
+    dir[1] = '\0';  /* Replace slash. */
+    argv0_base = dir + 2;
   } else {
+    argv0_base = p;
     for (; p != dir && p[-1] == '/'; --p) {}
     p[p == dir] = '\0';  /* Remove basename of dir. */
   }
@@ -772,8 +777,7 @@ int main(int argc, char **argv) {
       }
     }
     *argp = NULL;
-    prog = strdupcat(argv0, ".bin", "");  /* "ld.bin". */
-    args[0] = prog;
+    args[0] = strdupcat(argv0, ".bin", "");  /* "ld.bin". */
     if (is_verbose) {
       fdprint(2, escape_argv("info: running ld:\n", args, "\n"));
     }
@@ -806,8 +810,8 @@ int main(int argc, char **argv) {
         exit(WIFEXITED(status) ? WEXITSTATUS(status) : 124);
       }
     }
-    execv(prog, args);
-    fdprint(2, strdupcat("error: clang-ld: exec failed: ", prog, "\n"));
+    execv(args[0], args);
+    fdprint(2, strdupcat("error: clang-ld: exec failed: ", args[0], "\n"));
     return 120;
   }
 
@@ -818,8 +822,14 @@ int main(int argc, char **argv) {
    */
   argv0 = argv[0];
   argp = args = malloc(sizeof(*args) * (argc + 20));
-  /* TODO(pts): Make clang.bin configurable. */
-  *argp++ = prog = strdupcat(dir, "/clang.bin", "");
+  /* Now argv0_base looks like "clang" or "clang-3.3". We make version_suffix
+   * point to the suffix: "" or "-3.3".
+   */
+  for (version_suffix = argv0_base + strlen(argv0_base);
+       version_suffix != argv0_base && *version_suffix != '-';
+       --version_suffix) {}
+  if (*version_suffix != '-') version_suffix = "";
+  *argp++ = strdupcat(dir, strdupcat("/clang", version_suffix, ".bin"), "");
   for (argi = argv + 1; (arg = *argi) && 0 != strcmp(arg, "-v"); ++argi) {}
   if (*argi) is_verbose = 1;
   /* It's important that -xstatic doesn't trigger when argv[1] is "-cc1",
@@ -922,7 +932,7 @@ int main(int argc, char **argv) {
 
         /* It's important to keep clanginclude the last, for consistency.
          */
-        p = strdupcat(dirup, "/clanginclude", "");
+        p = strdupcat(dirup, "/clanginclude", version_suffix);
         if (0 != stat(p, &st) || !S_ISDIR(st.st_mode)) {
          dir_missing:
           fdprint(2, strdupcat(
@@ -1029,7 +1039,7 @@ int main(int argc, char **argv) {
     if (lang.is_compiling) {
       if (!has_nostdinc) {
         *argp++ = "-idirafter";
-        *argp++ = strdupcat(dirup, "/clanginclude", "");
+        *argp++ = strdupcat(dirup, "/clanginclude", version_suffix);
       }
       if (archbit == ARCHBIT_64 && !has_nostdinc) {
         /* Let the compiler find our replacement for gnu/stubs-64.h on 32-bit
@@ -1074,7 +1084,7 @@ int main(int argc, char **argv) {
   if (is_verbose) {
     fdprint(2, escape_argv("info: running clang frontend:\n", args, "\n"));
   }
-  execv(prog, args);
-  fdprint(2, strdupcat("error: clang: exec failed: ", prog, "\n"));
+  execv(args[0], args);
+  fdprint(2, strdupcat("error: clang: exec failed: ", args[0], "\n"));
   return 120;
 }

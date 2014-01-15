@@ -60,7 +60,8 @@ using 7z instead (`sudo apt-get install p7zip-full' first):
 Now you can already run pts-clang/bin/clang and pts-clang/bin/clang++ . If
 you don't like typing that much, you can either create symlinks to
 pts-clang/bin/clang and pts-clang/bin/clang++ in a directory in your $PATH,
-or add pts-clang/pathbin to your $PATH. An example
+or add the matching pts-clang/clangpathbin-* to your $PATH (add it to the
+beginnning to make it override other clang and clang++ commands). An example
 temporary solution (which affects the current terminal window only):
 
   $ export PATH="$PWD/pts-clang/pathbin:$PATH"

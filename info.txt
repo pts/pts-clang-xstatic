@@ -86,7 +86,8 @@ Developer info:
 TODOs for new features:
 
 * TODO(pts): Make clang_trampoline.cc function as both clang++ and clang++-3.3
-  (Without the clang.bin symlink having been created.)
+  (Without the clang.bin symlink having been created.) Also split the ld
+  binary so it doesn't remain a symlink.
 * TODO(pts): Add dietlibc support.
 * TODO(pts): Add dietlibc C++ compilation support.
 * TODO(pts): add __uclibc__; dietlibc adds -D__dietlibc__ (uClibc doesn't
