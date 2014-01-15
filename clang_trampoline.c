@@ -2,11 +2,10 @@
     set -ex; ${CC:-gcc} -s -Os -fno-stack-protector \
     -W -Wall -o clang_trampoline "$0"; exit 0
 /*
- * clang_trampline.c: clang and ld trampoline for .so file redir and -xstatic
+ * clang_trampline.c: clang trampoline for pts-clang
  * by pts@fazekas.hu at Fri Dec 13 22:17:42 CET 2013
  *
- * This program examines its argv, modifies some args, and exec()s "clang.bin"
- * or "ld.bin".
+ * This program examines its argv, modifies some args, and exec()s "clang.bin".
  *
  * Since our process is short-lived, we don't bother free()ing memory.
  *
@@ -293,35 +292,10 @@ static char *escape_argv(const char *prefix, char **argv, char *suffix) {
   return out;
 }
 
-/* Return true iff we've received a linker command-line. */
-static char detect_linker(char **argv) {
-  char **argi, *arg;
-  for (argi = argv + 1; (arg = *argi) &&
-       /* We could also use `-z relro' or `-m elf_i386' or ther values. */
-       0 != strcmp(arg, "--eh-frame-hdr") &&  /* By clang. */
-       0 != strcmp(arg, "--build-id") &&  /* By clang and gcc. */
-       0 != strncmp(arg, "--hash-style=", 13) &&
-       /* It's important that we don't match --do-xstaticcld here. */
-       0 != strcmp(arg, "--do-xclangld") &&
-       0 != strcmp(arg, "-dynamic-linker") &&  /* By clang. */
-       0 != strcmp(arg, "--start-group") &&  /* By gcc/clang -static. */
-       0 != strcmp(arg, "--as-needed") &&  /* By gcc/clang witout -static. */
-       0 != strcmp(arg, "--no-as-needed"); ++argi) {}
-  return ! !*argi;
-}
-
 static void fdprint(int fd, const char *msg) {
   const size_t smsg = strlen(msg);
   if (smsg != 0U + write(fd, msg, smsg)) exit(121);
 }
-
-#if 0
-static char is_dirprefix(const char *s, const char *prefix) {
-  const size_t sprefix = strlen(prefix);
-  return 0 == strncmp(s, prefix, sprefix) && (
-      s[sprefix] == '\0' || s[sprefix] == '/');
-}
-#endif
 
 static char is_argprefix(const char *s, const char *prefix) {
   const size_t sprefix = strlen(prefix);
@@ -511,68 +485,6 @@ static void detect_lang(const char *prog, char **argv, lang_t *lang) {
   }
 }
 
-/* Check that the linker is not instructed to link *crt*.o files from the
- * wrong directory. Most of the time this is a configuration issue, e.g. the
- * wrong value for the -B compiler flag was specified, and now the compiler
- * has instructed the linker to look for the *crt*.o files a system-default
- * (e.g. /usr/lib/...) directory.
- */
-static void check_ld_crtoarg(char **argv, char is_xstatic) {
-  /* If a relevant *crt*.o file is missing in xstaticcld or clangldxs, then
-   * gcc generates e.g.
-   * /usr/lib/gcc/x86_64-linux-gnu/4.6/../../../i386-linux-gnu/crtn.o , and
-   * pts-static-clang generates crtn.o . We detect and fail on both.
-   */
-  char had_error = 0;
-  char **argi, *supported_dir;
-  const char *arg, *basename, *argend, *supbasename;
-  size_t supdirlen;
-  for (supbasename = argv[0] + strlen(argv[0]);
-       supbasename != argv[0] && supbasename[-1] != '/'; --supbasename) {}
-  supdirlen = supbasename - argv[0];
-  for (argi = argv + 1; (arg = *argi); ++argi) {
-    if (0 == strcmp(arg, "-o") && argi[1]) {
-      ++argi;
-      continue;
-    }
-    if (arg[0] == '-') continue;
-    argend = arg + strlen(arg);
-    for (basename = argend; basename != arg && basename[-1] != '/';
-         --basename) {}
-    if (basename[0] == '\0' || argend - arg < 2 ||
-        argend[-1] != 'o' || argend[-2] != '.' ||
-        ((0 != strncmp(basename, "crt", 3) ||
-          ((!is_xstatic || 0 != strcmp(basename, "crt0.o")) &&
-           (!is_xstatic || 0 != strcmp(basename, "crt1.o")) &&
-           (!is_xstatic || 0 != strcmp(basename, "crt2.o")) &&
-           (!is_xstatic || 0 != strcmp(basename, "crti.o")) &&
-           (!is_xstatic || 0 != strcmp(basename, "crtn.o")) &&
-           0 != strcmp(basename, "crtbegin.o") &&
-           0 != strcmp(basename, "crtbeginS.o") &&
-           0 != strcmp(basename, "crtbeginT.o") &&
-           0 != strcmp(basename, "crtend.o") &&
-           0 != strcmp(basename, "crtendS.o") &&
-           0 != strcmp(basename, "crtfastmath.o"))) &&
-         (0 != strcmp(basename + 1, "crt1.o") ||
-          (0 != strcmp(basename, "Scrt1.o") &&
-           0 != strcmp(basename, "Mcrt1.o") &&
-           0 != strcmp(basename, "gcrt1.o"))))) continue;
-    if (0 == strncmp(arg, argv[0], supdirlen)) continue;
-    if (supdirlen == 0) {
-      supported_dir = ".";
-    } else {
-      supported_dir = malloc(supdirlen);
-      memcpy(supported_dir, argv[0], supdirlen - 1);
-      supported_dir[supdirlen - 1] = '\0';
-    }
-    fdprint(2, strdupcat(
-        "error: *crt*.o file linked from unsupported location "
-        "(supported is ", strdupcat(supported_dir, "): ", arg), "\n"));
-    had_error = 1;
-  }
-  if (had_error) exit(122);
-}
-
 static char is_m32_or_m64(const char *arg) {
   return 0 == strcmp(arg, "-m32") || 0 == strcmp(arg, "-m64");
 }
@@ -636,184 +548,6 @@ int main(int argc, char **argv) {
     p[p == dir] = '\0';  /* Remove basename of dir. */
   }
   dirup = get_up_dir_alloc(dir);
-  if (detect_linker(argv)) {  /* clang trampoline runs as as ld. */
-    /* Please note that we are only invoked for `clang -xstatic', because
-     * without -xstatic, the ld symlink is outside of the clang program search
-     * path, because -gcc-toolchain was not specified.
-     */
-    /* All we do is exec()ing ld.bin with the following dropped from argv:
-     *
-     * -L/usr/lib...
-     * -L/lib...
-     * --hash-style=both (because not supported by old ld)
-     * --build-id (because not supported by old ld)
-     * -z relro (because it increases the binary size and it's useless for static)
-     */
-    char **ermine_args = NULL;
-    char *output_file = 0;
-    argp = args = malloc(sizeof(*args) * (argc + 5));
-    *argp++ = argv0 = *argv;
-    ldmode = LM_XSTATIC;
-    for (argi = argv + 1; (arg = *argi); ++argi) {
-      if (0 == strcmp(arg, "--do-xclangld")) {
-        ldmode = LM_XCLANGLD;
-      } else if (0 == strcmp(arg, "--do-clangldv")) {
-        is_verbose = 1;
-      }
-    }
-    check_ld_crtoarg(argv, ldmode == LM_XSTATIC);
-    if (ldmode == LM_XCLANGLD) {
-      char is_ermine = 0;
-      int ermine_flag_count = 0;
-      char **eargp = NULL;
-      output_file = "a.out";
-      for (argi = argv + 1; (arg = *argi); ++argi) {
-        if (0 == strcmp(arg, "-=xermine")) {
-          is_ermine = 1;
-        } else if (0 == strncmp(arg, "-=xermine=", 10)) {
-          is_ermine = 1;
-          ++ermine_flag_count;
-        } else if (arg[0] == '-' && arg[1] == 'o') {
-          output_file = (arg[2] == '\0' && argi[1] != NULL) ? *++argi : arg + 2;
-        }
-      }
-      if (is_ermine) {
-        char *eprog;
-        eargp = ermine_args = malloc(
-            sizeof(*ermine_args) * (ermine_flag_count + 4));
-        *eargp++ = strdupcat(dir, "/ermine", "");
-        eprog = find_on_path(eargp[-1]);
-        if (!eprog) {
-          fdprint(2, strdupcat(
-              "error: could not find Ermine: ", eargp[-1], "\n"));
-          return 126;
-        }
-        free(eprog);
-        *eargp++ = "-o";
-        *eargp++ = output_file;
-        output_file = strdupcat(output_file, ".eE0", "");
-      }
-      for (argi = argv + 1; (arg = *argi); ++argi) {
-        if (0 == strcmp(arg, "--do-xclangld") ||
-            0 == strcmp(arg, "--do-clangldv") ||
-            0 == strcmp(arg, "-=xermine")) {
-        } else if (0 == strncmp(arg, "-=xermine=", 10)) {
-          *eargp++ = arg + 10;
-        } else if (is_ermine && arg[0] == '-' && arg[1] == 'o') {
-          /* Skip the original output_file argument. */
-          if (arg[2] == '\0' && argi[1] != NULL) ++argi;
-        } else {
-          *argp++ = *argi;
-        }
-      }
-      if (is_ermine) {
-        *argp++ = "-o";
-        *argp++ = output_file;
-        *eargp++ = output_file;
-        *eargp = NULL;
-      }
-    } else {  /* ldmode == LM_XSTATIC. */
-      char **argli;  /* Where to add the -L flags. */
-
-      *argp++ = "-nostdlib";  /* No system directories to find .a files. */
-      /* Find argli: in front of the last -L (which will be removed), but no
-       * later than just before the first -l.
-       */
-      argli = NULL;
-      for (argi = argv + 1; (arg = *argi); ++argi) {
-        if (arg[0] == '-') {
-          if (arg[1] == 'L') {  /* "-L". */
-            argli = argi;
-          } else if (arg[1] == 'l') {  /* "-l". */
-            if (!argli) argli = argi;
-            break;
-          }
-        }
-      }
-      if (!argli) argli = argv + 1;
-
-      for (argi = argv + 1; (arg = *argi); ++argi) {
-        if (argi == argli) {
-          char **argj;
-          /* Add the user-specified link dirs first (just like non-xstatic). */
-          for (argj = argv + 1; *argj; ++argj) {
-            if (0 == strncmp(*argj, "-=L", 3)) {
-              *argp++ = strdupcat("-L", "", *argj + 3);
-            }
-          }
-          /* We put xstaticcld with libgcc.a first, because clang puts
-           * /usr/lib/gcc/i486-linux-gnu/4.4 with libgcc.a before /usr/lib with
-           * libc.a .
-           *
-           * We add these -L flags even if compiler -nostdlib was specified,
-           * because non-xstatic compilers do the same.
-           */
-          *argp++ = strdupcat("-L", dirup, "/xstaticcld");
-          *argp++ = strdupcat("-L", dirup, "/xstaticusr/lib");
-          argli = NULL;  /* Don't insert the -L flags again. */
-        }
-        if (0 == strcmp(arg, "-z") &&
-            argi[1] && 0 == strcmp(argi[1], "relro")) {
-          /* Would increase size. */
-          ++argi;  /* Omit both arguments: -z relro */
-        } else if (arg[0] == '-' && arg[1] == 'L') {  /* "-L". */
-          if (arg[2] == '\0' && argi[1]) ++argi;
-          /* Omit -L... containing the system link dirs, the user-specified link
-           * dir flags were passed as -=L...
-           */
-        } else if (0 == strncmp(arg, "-=L", 3)) {
-          /* Omit -=L here, gets added at position argli. */
-        } else if (
-            0 == strcmp(arg, "-nostdlib") ||
-            0 == strcmp(arg, "--do-clangcld") ||
-            0 == strcmp(arg, "--do-clangldv") ||
-            0 == strncmp(arg, "--hash-style=", 13) ||  /* Would increase size.*/
-            0 == strcmp(arg, "--build-id") ||
-            0 == strncmp(arg, "--sysroot=", 10)) {
-          /* Omit this argument. */
-        } else {
-          *argp++ = *argi;
-        }
-      }
-    }
-    *argp = NULL;
-    args[0] = strdupcat(argv0, ".bin", "");  /* "ld.bin". */
-    if (is_verbose) {
-      fdprint(2, escape_argv("info: running ld:\n", args, "\n"));
-    }
-    if (ermine_args) {
-      pid_t pid = fork();
-      if (pid < 0) exit(124);
-      if (pid != 0) {  /* Parent. */
-        int status;
-        pid_t pid2 = waitpid(pid, &status, 0);
-        if (pid != pid2) exit(124);
-        if (status != 0) {
-          unlink(output_file);  /* The .eE0 file. */
-          exit(WIFEXITED(status) ? WEXITSTATUS(status) : 124);
-        }
-        /* Done with ld, run ermine. */
-        if (is_verbose) {
-          fdprint(2, escape_argv("info: running ermine:\n", ermine_args, "\n"));
-        }
-        pid = fork();
-        if (pid < 0) exit(124);
-        if (pid == 0) {  /* Child. */
-          execv(ermine_args[0], ermine_args);
-          fdprint(2, strdupcat(
-              "error: clang-ermine: exec failed: ", ermine_args[0], "\n"));
-          exit(120);
-        }
-        pid2 = waitpid(pid, &status, 0);
-        unlink(output_file);  /* The .eE0 file. */
-        if (pid != pid2) exit(124);
-        exit(WIFEXITED(status) ? WEXITSTATUS(status) : 124);
-      }
-    }
-    execv(args[0], args);
-    fdprint(2, strdupcat("error: clang-ld: exec failed: ", args[0], "\n"));
-    return 120;
-  }
 
   /* clang was doing:
    * readlink("/proc/self/exe", ".../clang/binlib/ld-linux.so.2", ...)

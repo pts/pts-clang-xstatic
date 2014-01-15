@@ -29,9 +29,15 @@ STRIP='strip -S --strip-unneeded --remove-section=.note.gnu.gold-version --remov
 gcc $CFLAGS -c xstatic.c
 ld -o xstatic $LDFLAGS1 xstatic.o $LDFLAGS2
 $STRIP xstatic
+
 gcc $CFLAGS -c clang_trampoline.c
 ld -o clang $LDFLAGS1 clang_trampoline.o $LDFLAGS2
 $STRIP clang
-ls -l xstatic clang
 
-: mktrampolines OK.
+gcc $CFLAGS -c clang_ld.c
+ld -o clang_ld $LDFLAGS1 clang_ld.o $LDFLAGS2
+$STRIP clang_ld
+
+ls -l xstatic clang clang_ld
+
+: mktrampolines-dietlibc OK.
