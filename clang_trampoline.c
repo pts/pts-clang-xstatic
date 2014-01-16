@@ -436,9 +436,12 @@ static void detect_lang(const char *prog, char **argv, lang_t *lang) {
   for (argi = argv + 1; (arg = *argi); ++argi) {
     if (0 == strcmp(arg, "-xc++")) {
       lang->is_cxx = 1;
-    } else if (0 == strcmp(arg, "-ccc-cxx")) {  /* Enable C++ for Clang. */
+    } else if (0 == strcmp(arg, "--driver-mode=g++") ||
+               0 == strcmp(arg, "-ccc-cxx")) {  /* Enable C++ for Clang. */
       lang->is_cxx = 1;
-      /* -ccc-cxx is a Clang-specific flag, gcc doesn't have it.*/
+      /* -ccc-cxx (between clang 3.0 and 3.3) and --driver-mode=g++ (Clang 3.4)
+       * are Clang-specific flags, gcc doesn't have them.
+       */
       lang->is_clang = 1;
     } else if (0 == strcmp(arg, "-x") && argi[1]) {
       lang->is_cxx = 0 == strcmp(*++argi, "c++");
@@ -511,6 +514,11 @@ static char *get_up_dir_alloc(const char *dir) {
     p[-1] = '\0';  /* Remove basename of dirup. */
   }
   return dirup;
+}
+
+static char *get_cxx_flag(const char *version_suffix) {
+  /* TODO(pts): Make it work for -3.5 etc. in the future. */
+  return 0 == strcmp(version_suffix, "-3.4") ? "--driver-mode=g++" : "-ccc-cxx";
 }
 
 typedef enum ldmode_t {
@@ -630,8 +638,7 @@ int main(int argc, char **argv) {
     need_linker = detect_need_linker(argv);
     detect_nostdinc(argv, &has_nostdinc, &has_nostdincxx);
     detect_lang(argv0, argv, &lang);
-    if (lang.is_cxx_prog) *argp++ = "-ccc-cxx";
-
+    if (lang.is_cxx_prog) *argp++ = get_cxx_flag(version_suffix);
     /* When adding more arguments here, increase the args malloc count. */
     /* We don't need get_autodetect_archflag(argv), we always send "-m32". */
     *argp++ = "-m32";
@@ -736,7 +743,7 @@ int main(int argc, char **argv) {
     detect_nostdinc(argv, &has_nostdinc, &has_nostdincxx);
     archbit = get_archbit_detected(argv);
     archbit_override = get_archbit_override(archbit);
-    if (lang.is_cxx_prog) *argp++ = "-ccc-cxx";
+    if (lang.is_cxx_prog) *argp++ = get_cxx_flag(version_suffix);
     if (archbit_override == ARCHBIT_32) {
       *argp++ = "-m32";
       archbit = ARCHBIT_32;

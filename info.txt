@@ -85,7 +85,6 @@ Developer info:
 
 TODOs for new features:
 
-* TODO(pts): clang-3.4 doesn't have -ccc-cxx, which we use. What does it have?
 * TODO(pts): Get rid of -static-libcc warning in clang-3.0 (is this flag
   ignored by clang? If so, get rid of the flag).
   ~/d/pts-clang-3.0/bin/clang-3.0 -W -Wall -O2 -s ~/prg/hellow.c

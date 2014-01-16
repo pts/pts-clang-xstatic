@@ -452,9 +452,12 @@ static void detect_lang(const char *prog, char **argv, lang_t *lang) {
   for (argi = argv + 1; (arg = *argi); ++argi) {
     if (0 == strcmp(arg, "-xc++")) {
       lang->is_cxx = 1;
-    } else if (0 == strcmp(arg, "-ccc-cxx")) {  /* Enable C++ for Clang. */
+    } else if (0 == strcmp(arg, "--driver-mode=g++") ||
+               0 == strcmp(arg, "-ccc-cxx")) {  /* Enable C++ for Clang. */
       lang->is_cxx = 1;
-      /* -ccc-cxx is a Clang-specific flag, gcc doesn't have it.*/
+      /* -ccc-cxx (between clang 3.0 and 3.3) and --driver-mode=g++ (Clang 3.4)
+       * are Clang-specific flags, gcc doesn't have them.
+       */
       lang->is_clang = 1;
     } else if (0 == strcmp(arg, "-x") && argi[1]) {
       lang->is_cxx = 0 == strcmp(*++argi, "c++");
