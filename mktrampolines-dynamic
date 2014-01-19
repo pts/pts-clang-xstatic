@@ -8,7 +8,7 @@
 set -ex
 
 CFLAGS='-m32 -fno-stack-protector -fomit-frame-pointer -mpreferred-stack-boundary=2 -falign-functions=1 -falign-jumps=1 -falign-loops=1 -Os -W -Wall -Werror=implicit -Werror=implicit-int -Werror=implicit-function-declaration'
-STRIP='strip -S --strip-unneeded --remove-section=.note.gnu.gold-version --remove-section=.comment --remove-section=.note --remove-section=.note.gnu.build-id --remove-section=.note.ABI-tag --remove-section=.gnu.hash'
+STRIP='strip -S --strip-unneeded --remove-section=.note.gnu.gold-version --remove-section=.comment --remove-section=.note --remove-section=.note.gnu.build-id --remove-section=.note.ABI-tag --remove-section=.eh_frame --remove-section=.eh_frame_ptr --remove-section=.jcr'
 
 gcc $CFLAGS -o xstatic xstatic.c
 $STRIP xstatic

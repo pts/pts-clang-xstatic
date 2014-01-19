@@ -24,7 +24,7 @@ test -f dietlibc/miniinc.h
 CFLAGS='-m32 -fno-stack-protector -fomit-frame-pointer -mpreferred-stack-boundary=2 -falign-functions=1 -falign-jumps=1 -falign-loops=1 -Os -W -Wall -Werror=implicit -Werror=implicit-int -Werror=implicit-function-declaration --sysroot dietlibc -isystem dietlibc -static-libgcc -DUSE_MINIINC'
 LDFLAGS1='-nostdlib -m elf_i386 -static -s dietlibc/start.o'
 LDFLAGS2='dietlibc/lib0.a'
-STRIP='strip -S --strip-unneeded --remove-section=.note.gnu.gold-version --remove-section=.comment --remove-section=.note --remove-section=.note.gnu.build-id'
+STRIP='strip -S --strip-unneeded --remove-section=.note.gnu.gold-version --remove-section=.comment --remove-section=.note --remove-section=.note.gnu.build-id --remove-section=.note.ABI-tag --remove-section=.eh_frame --remove-section=.eh_frame_ptr --remove-section=.jcr --remove-section=.got.plt'
 
 gcc $CFLAGS -c xstatic.c
 ld -o xstatic $LDFLAGS1 xstatic.o $LDFLAGS2
