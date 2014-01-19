@@ -27,7 +27,7 @@ test -f minilibc/miniinc.h
 CFLAGS='-m32 -s -fno-stack-protector -fomit-frame-pointer -mpreferred-stack-boundary=2 -falign-functions=1 -falign-jumps=1 -falign-loops=1  -fno-unwind-tables -fno-asynchronous-unwind-tables -fno-unroll-loops -fmerge-all-constants -Os -W -Wall -Werror=implicit -Werror=implicit-int -Werror=implicit-function-declaration --sysroot minilibc -isystem minilibc -static-libgcc -DUSE_MINIINC'
 LDFLAGS1='-nostdlib -m elf_i386 -static -s minilibc/crt1.o minilibc/crti.o minilibc/crtbeginT.o'
 LDFLAGS2='minilibc/lib0.a minilibc/crtend.o minilibc/crtn.o'
-STRIP='strip -S --strip-unneeded --remove-section=.note.gnu.gold-version --remove-section=.comment --remove-section=.note --remove-section=.note.gnu.build-id --remove-section=.note.ABI-tag --remove-section=.got.plt --remove-section=.eh_frame --remove-section=.eh_frame_ptr --remove-section=.jcr'
+STRIP='strip -s --strip-unneeded --remove-section=.note.gnu.gold-version --remove-section=.comment --remove-section=.note --remove-section=.note.gnu.build-id --remove-section=.note.ABI-tag --remove-section=.got.plt --remove-section=.eh_frame --remove-section=.eh_frame_ptr --remove-section=.jcr'
 
 gcc $CFLAGS -c xstatic.c
 ld -o xstatic $LDFLAGS1 xstatic.o $LDFLAGS2
