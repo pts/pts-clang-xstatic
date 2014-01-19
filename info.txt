@@ -82,6 +82,10 @@ Developer info:
 * `diet gcc ...' doesn't run any constructors or destructors (not even gcc
   __attribute__((constructor)):
   .../dietlibc-0.33/bin-i386/diet -v gcc -m32 -W -Wall -s -O2 cons.c && ./a.out >cons.out
+* gcc compilaction flags specs:
+  $ gcc -dumpspecs > specfile
+  $ $ sed -i 's/hash-style=gnu/hash-style=both/' specfile
+  $ $ gcc -specs=specfile hello.c
 
 TODOs for new features:
 
