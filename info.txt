@@ -89,6 +89,7 @@ Developer info:
 
 TODOs for new features:
 
+* TODO(pts): To clang, add checking for clangld32/ld.
 * TODO(pts): Use -nostartfiles in xstatic, to get rid of check_ld_crtoarg in
   xstatic.c .
 * TODO(pts): Get rid of -static-libgcc warning in clang-3.0 (is this flag
