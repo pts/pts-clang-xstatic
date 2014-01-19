@@ -25,22 +25,25 @@ set -ex
 test -f musllibc/lib0.a
 test -f musllibc/crt1.o
 test -f musllibc/miniinc.h
-CFLAGS='-m32 -fno-stack-protector -fomit-frame-pointer -mpreferred-stack-boundary=2 -falign-functions=1 -falign-jumps=1 -falign-loops=1 -Os -W -Wall -Werror=implicit -Werror=implicit-int -Werror=implicit-function-declaration --sysroot musllibc -isystem musllibc -static-libgcc -DUSE_MINIINC'
+CFLAGS='-m32 -s -fno-stack-protector -fomit-frame-pointer -mpreferred-stack-boundary=2 -falign-functions=1 -falign-jumps=1 -falign-loops=1 -fno-unwind-tables -fno-asynchronous-unwind-tables -fno-unroll-loops -fmerge-all-constants -Os -W -Wall -Werror=implicit -Werror=implicit-int -Werror=implicit-function-declaration --sysroot musllibc -isystem musllibc -static-libgcc -DUSE_MINIINC'
 LDFLAGS1='-nostdlib -m elf_i386 -static -s musllibc/crt1.o musllibc/crti.o musllibc/crtbeginT.o'
 LDFLAGS2='musllibc/lib0.a musllibc/crtend.o musllibc/crtn.o'
 STRIP='strip -S --strip-unneeded --remove-section=.note.gnu.gold-version --remove-section=.comment --remove-section=.note --remove-section=.note.gnu.build-id --remove-section=.note.ABI-tag --remove-section=.eh_frame --remove-section=.eh_frame_ptr --remove-section=.jcr --remove-section=.got.plt'
 
 gcc $CFLAGS -c xstatic.c
 ld -o xstatic $LDFLAGS1 xstatic.o $LDFLAGS2
-$STRIP xstatic
+$STRIP   xstatic
+./sstrip xstatic
 
 gcc $CFLAGS -c clang_trampoline.c
 ld -o clang $LDFLAGS1 clang_trampoline.o $LDFLAGS2
-$STRIP clang
+$STRIP   clang
+./sstrip clang
 
 gcc $CFLAGS -c clang_ld.c
 ld -o clang_ld $LDFLAGS1 clang_ld.o $LDFLAGS2
-$STRIP clang_ld
+$STRIP   clang_ld
+./sstrip clang_ld
 
 ls -l xstatic clang clang_ld
 

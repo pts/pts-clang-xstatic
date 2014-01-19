@@ -7,13 +7,21 @@
 
 set -ex
 
-CFLAGS='-m32 -fno-stack-protector -fomit-frame-pointer -mpreferred-stack-boundary=2 -falign-functions=1 -falign-jumps=1 -falign-loops=1 -Os -W -Wall -Werror=implicit -Werror=implicit-int -Werror=implicit-function-declaration'
+CFLAGS='-m32 -s -fno-stack-protector -fomit-frame-pointer -mpreferred-stack-boundary=2 -falign-functions=1 -falign-jumps=1 -falign-loops=1 -fno-unwind-tables -fno-asynchronous-unwind-tables -fno-unroll-loops -fmerge-all-constants -Os -W -Wall -Werror=implicit -Werror=implicit-int -Werror=implicit-function-declaration'
 STRIP='strip -S --strip-unneeded --remove-section=.note.gnu.gold-version --remove-section=.comment --remove-section=.note --remove-section=.note.gnu.build-id --remove-section=.note.ABI-tag --remove-section=.eh_frame --remove-section=.eh_frame_ptr --remove-section=.jcr'
 
 gcc $CFLAGS -o xstatic xstatic.c
-$STRIP xstatic
-gcc $CFLAGS -o clang clang_trampoline.c
-$STRIP clang
-ls -l xstatic clang
+$STRIP   xstatic
+./sstrip xstatic
 
-: mktrampolines OK.
+gcc $CFLAGS -o clang clang_trampoline.c
+$STRIP   clang
+./sstrip clang
+
+gcc $CFLAGS -o clang_ld clang_ld.c
+$STRIP   clang_ld
+./sstrip clang_ld
+
+ls -l xstatic clang clang_ld
+
+: mktrampolines-dynamic OK.
