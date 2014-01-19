@@ -364,7 +364,6 @@ typedef enum ldmode_t {
 
 int main(int argc, char **argv) {
   char *argv0;
-  char *argv0_base;  /* The basename of argv[0], after following symlinks. */
   char *dir, *dirup;
   char *p;
   char **args, **argp;
@@ -382,9 +381,7 @@ int main(int argc, char **argv) {
   if (p == dir) {
     dir = strdupcat("./", dir, "");
     dir[1] = '\0';  /* Replace slash. */
-    argv0_base = dir + 2;
   } else {
-    argv0_base = p;
     for (; p != dir && p[-1] == '/'; --p) {}
     p[p == dir] = '\0';  /* Remove basename of dir. */
   }
