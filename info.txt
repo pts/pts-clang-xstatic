@@ -89,7 +89,9 @@ Developer info:
 
 TODOs for new features:
 
-* TODO(pts): Get rid of -static-libcc warning in clang-3.0 (is this flag
+* TODO(pts): Use -nostartfiles in xstatic, to get rid of check_ld_crtoarg in
+  xstatic.c .
+* TODO(pts): Get rid of -static-libgcc warning in clang-3.0 (is this flag
   ignored by clang? If so, get rid of the flag).
   ~/d/pts-clang-3.0/bin/clang-3.0 -W -Wall -O2 -s ~/prg/hellow.c
   clang-3.0: warning: argument unused during compilation: '-static-libgcc'
