@@ -136,5 +136,7 @@ TODOs for new features:
 * TODO(pts): Make -xsysld and -xermine compatible by implementing -xermine
              in the compiler frontend level (rather than at the linker
              level).
+* TODO(pts): Do we need crtbegin*.o and crtend.o in uClibc? If we removed
+             them, would some _init/_fini hooks get skipped?
 
 __EOF__
