@@ -503,7 +503,9 @@ int main(int argc, char **argv) {
           argli = NULL;  /* Don't insert the -L flags again. */
         }
         if (0 == strcmp(arg, "-z") &&
-            argi[1] && 0 == strcmp(argi[1], "relro")) {
+            argi[1] &&
+            (0 == strcmp(argi[1], "relro") ||
+             0 == strcmp(argi[1], "norelro"))) {
           /* Would increase size. */
           ++argi;  /* Omit both arguments: -z relro */
         } else if (arg[0] == '-' && arg[1] == 'L') {  /* "-L". */
