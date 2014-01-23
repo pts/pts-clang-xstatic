@@ -1,10 +1,17 @@
 README for the pts-xstatic Linux i386 uClibc static compilation tool
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 pts-xstatic is a convenient wrapper tool for compiling and creating
-portable, statically linked Linux i386 executables. It works on Linux i386 and
-Linux x86_64 host systems. It wraps an existing
-compiler (GCC or Clang) of your choice, and it links against uClibc and the
-other base libraries included in the pts-xstatic binary release.
+portable, statically linked Linux i386 executables in C and C++. It works on
+Linux i386 and Linux x86_64 host systems. It wraps an existing compiler (GCC
+or Clang) of your choice, and it links against uClibc and the other base
+libraries included in the pts-xstatic binary release.
+
+See also pts-xdiet
+(http://raw.github.com/pts/pts-clang-xstatic/master/README.pts-xdiet.txt)
+which is similar to pts-xstatic, but it works with diet libc rather then
+uClibc. The executables compiled by pts-xdiet tend to be smaller than those
+by pts-xstatic. Stay tuned for more info about execution speed and
+compatibility (e.g. C++ and libraries) differences.
 
 C compilers supported: gcc-4.1 ... gcc-4.8, clang-3.0 ... clang-3.3. C++
 compilers supported: g++ and clang++ corresponding to the supported C
