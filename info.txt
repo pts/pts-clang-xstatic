@@ -51,7 +51,7 @@ Developer info:
   libstdc++.a.
 * clang always opens /etc/lsb-release, it's hardwired to DetectDistro,
   impossible to get rid of.
-* crt*.o: http://dev.gentoo.org/~vapier/crt.txt
+* *crt*.o: http://dev.gentoo.org/~vapier/crt.txt
   General linking order:
   crt1.o crti.o crtbegin.o [-L paths] [user objects] [gcc libs] [C libs] [gcc libs] crtend.o crtn.o
   More references: http://gcc.gnu.org/onlinedocs/gccint/Initialization.html
