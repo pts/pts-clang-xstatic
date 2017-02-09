@@ -14,13 +14,38 @@ pts-xstatic. To minimize system dependencies, pts-xstatic can compile
 with pts-clang (for both C and C++), which is portable, and you can install
 it as non-root.
 
-As an alternative of pts-xstatic, if you want a tiny, self-contained
-(single-file) for Linux i386, please take a look at pts-tcc at
-http://ptspts.blogspot.hu/2009/11/tiny-self-contained-c-compiler-using.html
-. With pts-xstatic, you can create faster and smaller statically linked
-executables, with the compiler of your choice.
+As an alternative for pts-xstatic, see pts-xtiny
+(https://github.com/pts/pts-xtiny), which is a gcc wrapper for creatiny tiny
+(200-byte) Linux i386 executables. It contains a minimalistic libc (mostly
+system calls, and a few string.h functions and puts) with very small
+overhead. A hello-world with main+puts and gcc-4.8 is 292 bytes (!) with
+pts-xtiny, 7340 bytes with pts-xstatic and 5540 bytes if linked dynamically.
+If your executable sizes smaller than 50 kB when compiled with xstatic, you
+may probably benefit from further size reductions by pts-xtiny. Like
+pts-xstatic, pts-xtiny is also easy to install and use, because it works with
+any GCC (or Clang) already installed.
 
-As an alternative for pts-xstatic and uClibc, see diet libc
+As an alternative for pts-xstatic, see pts-tcc
+(https://github.com/pts/pts-tcc), which is a tiny, self-contained
+(single-file executable) C compiler and linker as well for Linux i386. With
+pts-xstatic, you can create faster and smaller statically linked
+executables, with the compiler of your choice. Please note that pts-tcc
+generates small executables if the code is small (e.g. hello-world), but
+it's not an optimizing compiler, so the generated code will be bloated and
+slow.
+
+If you want an even smaller hello-world on Linux i386, look at the
+state-of-the-art 62 bytes in
+http://www.muppetlabs.com/~breadbox/software/tiny/useless.html , and read
+how the ELF executable file was hand-crafted in assembly at:
+http://www.muppetlabs.com/~breadbox/software/tiny/ .
+
+As an alternative for pts-xstatic, see musl
+(https://www.musl-libc.org/) and its musl tool (which is an
+alternative of the xstatic tool), with which you can create even
+smaller binaries.
+
+As an alternative for pts-xstatic, see dietlibc
 (http://www.fefe.de/dietlibc/) and its diet tool (which is an
 alternative of the xstatic tool), with which you can create even
 smaller binaries.
@@ -39,8 +64,34 @@ Motivation
 2. libstdc++ is not easily available for uClibc, and it's a bit cumbersome
    to compile. pts-xstatic contains a precompiled version.
 
-Minimum installation
-~~~~~~~~~~~~~~~~~~~~
+Minimum installation with a preinstalled GCC
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If you want to install try pts-xstatic quickly, without root access, without
+installing any dependencies, and without changing any settings, and you have
+GCC installed, this is the easiest way:
+
+$ cd /tmp
+$ rm -f pts-xstatic-latest.sfx.7z
+$ wget http://pts.50.hu/files/pts-xstatic/pts-xstatic-latest.sfx.7z
+$ chmod +x pts-xstatic-latest.sfx.7z
+$ ./pts-xstatic-latest.sfx.7z -y  # Creates the pts-xstatic directory.
+$ cat >>hw.c <<'END'
+#include <stdio.h>
+int main(void) {
+  return !printf("Hello, %s!\n", "World");
+}
+END
+$ pts-xstatic/bin/xstatic gcc -s -O2 -W -Wall hw.c && ./a.out
+Hello, World!
+$ strace -e open ./a.out
+Hello, World!
+$ file a.out
+a.out: ELF 32-bit LSB executable, Intel 80386, version 1 (SYSV), statically linked, stripped
+$ ls -l a.out
+-rwxr-xr-x 1 pts pts 16996 Jan  2 23:17 a.out
+
+Minimum installation with the bundled Clang
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If you want to install try pts-xstatic quickly, without root access, without
 installing any dependencies, and without changing any settings, this is the
 easiest way:
@@ -314,4 +365,4 @@ copied manually to the xstaticusr directory.
 
 All software mentioned in this document is free software and open source.
 
-__EOF__
+__END__
