@@ -60,6 +60,8 @@ __extension__ typedef int __pid_t;
 typedef __ssize_t ssize_t;
 typedef __pid_t pid_t;
 
+extern char **environ;
+
 struct stat {
   __dev_t st_dev;
   unsigned short int __pad1;
@@ -110,6 +112,7 @@ extern char *strstr(__const char *__haystack, __const char *__needle) __attribut
 extern int stat(__const char *__restrict __file, struct stat *__restrict __buf) __attribute__((__nothrow__)) __attribute__((__nonnull__(1, 2)));
 extern char *getenv(__const char *__name) __attribute__((__nothrow__)) __attribute__((__nonnull__(1))) ;
 extern int execv(__const char *__path, char *__const __argv[]) __attribute__((__nothrow__)) __attribute__((__nonnull__(1)));
+extern int execve(__const char *__path, char *__const __argv[], char *__const __envp[]) __attribute__((__nothrow__)) __attribute__((__nonnull__(1)));
 extern int uname(struct utsname *__name) __attribute__((__nothrow__));
 extern int open(__const char *__file, int __oflag, ...) __attribute__((__nonnull__(1)));
 extern ssize_t read(int __fd, void *__buf, size_t __nbytes) ;

@@ -24,6 +24,18 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#undef HAVE_REALLOC
+
+#ifdef __XTINY__
+#ifndef __XTINY_FORWARD_MALLOC__
+#define __XTINY_FORWARD_MALLOC__ 1200000000  /* Almost 1.2 GB. */
+extern char __forward_malloc_heap[];
+char *__forward_malloc_heap_end =
+    __forward_malloc_heap + __XTINY_FORWARD_MALLOC__;
+#endif
+#include <xtiny.h>
+#else  /* not __XTINY__ */
+#define HAVE_REALLOC 1
 #ifdef USE_MINIINC
 #include <miniinc.h>
 #else
@@ -35,6 +47,8 @@
 #include <sys/utsname.h>
 #include <sys/wait.h>
 #include <unistd.h>
+extern char **environ;
+#endif
 #endif
 
 static char *strdupcat(const char *a, const char *b, const char *c) {
@@ -59,7 +73,12 @@ static char *readlink_alloc(const char *path) {
       buf[got] = '\0';
       return buf;
     }
+#ifdef HAVE_REALLOC
     buf = realloc(buf, len <<= 1);
+#else
+    buf = realloc_grow(buf, len, len << 1);
+    len <<= 1;
+#endif
   }
 }
 
@@ -551,7 +570,7 @@ int main(int argc, char **argv) {
         pid = fork();
         if (pid < 0) exit(124);
         if (pid == 0) {  /* Child. */
-          execv(ermine_args[0], ermine_args);
+          execve(ermine_args[0], ermine_args, environ);
           fdprint(2, strdupcat(
               "error: clang-ermine: exec failed: ", ermine_args[0], "\n"));
           exit(120);
@@ -562,7 +581,7 @@ int main(int argc, char **argv) {
         exit(WIFEXITED(status) ? WEXITSTATUS(status) : 124);
       }
     }
-    execv(args[0], args);
+    execve(args[0], args, environ);
     fdprint(2, strdupcat("error: clang-ld: exec failed: ", args[0], "\n"));
     return 120;
   }

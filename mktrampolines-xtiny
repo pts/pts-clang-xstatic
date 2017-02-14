@@ -1,0 +1,20 @@
+#!/bin/sh
+#
+# mktrampolines: build the static clang and xstatic trampolines
+# by pts@fazekas.hu at Tue Feb 14 17:01:45 CET 2017
+#
+# Run this script on an i386 or amd64 Linux.
+#
+#
+
+set -ex
+
+CFLAGS='-s -Os -fno-unroll-loops -fmerge-all-constants -Os -W -Wall -Wextra -Werror=implicit -Werror=implicit-int -Werror=implicit-function-declaration -mxtiny-forward-malloc=1200000000'
+
+xtiny gcc $CFLAGS -o xstatic xstatic.c
+xtiny gcc $CFLAGS -o clang clang_trampoline.c
+xtiny gcc $CFLAGS -o clang_ld clang_ld.c
+
+ls -l xstatic clang clang_ld
+
+: mktrampolines-xtiny OK.
