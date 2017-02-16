@@ -1,0 +1,33 @@
+#!/bin/sh
+#
+# mktrampolines-minidiet: build the static clang and xstatic trampolines
+# by pts@fazekas.hu at Thu Feb 16 17:19:27 CET 2017
+#
+# Run this script on an i386 or amd64 Linux.
+#
+# lib0.a was created from lib__xtiny.a in pts-xtiny on 2017-02-16.
+#
+# $ rm -f lib0.a &&
+#   ar cr lib0.a strcmp.o strncmp.o strcpy.o strchr.o strstr.o \
+#   realloc_grow.o strdup.o strcat.o strlen.o memcmp.o memcpy.o getenv.o \
+#   __forward_malloc.o __forward_malloc_free.o
+#
+
+set -ex
+
+test -f minidiet/lib0.a
+test -f minidiet/_start.o
+test -f minidiet/miniinc.h
+
+HEAP_SIZE=1200000000
+CFLAGS='-isystem minidiet -isysroot minidiet -m32 -s -Os -static -s -fno-stack-protector -fomit-frame-pointer -mpreferred-stack-boundary=2 -falign-functions=1 -falign-jumps=1 -falign-loops=1 -fno-unwind-tables -fno-asynchronous-unwind-tables -fno-ident -fno-builtin-exit -fno-builtin-_exit -fno-builtin-_Exit -fno-unroll-loops -fmerge-all-constants -Os -W -Wall -Wextra -Werror=implicit -Werror=implicit-int -Werror=implicit-function-declaration -DUSE_MINIINC -D__MINIDIET__ -D__MINIDIET_FORWARD_MALLOC__='"$HEAP_SIZE"' -Wl,--defsym=__forward_malloc_heap_end=__forward_malloc_heap+'"$HEAP_SIZE"' -Wl,--build-id=none,-N,-T,minidiet/minidiet.scr'
+CFLAGSEND='-nostdlib -nostartfiles minidiet/_start.o minidiet/lib0.a'
+
+# TODO(pts): Why are the executable sizes different with mktrampolones-minidiet, mktrampolines-xtiny and -mxtiny-linker-script ? Different version of linker?
+gcc $CFLAGS -o xstatic xstatic.c $CFLAGSEND
+gcc $CFLAGS -o clang clang_trampoline.c $CFLAGSEND
+gcc $CFLAGS -o clang_ld clang_ld.c $CFLAGSEND
+
+ls -l xstatic clang clang_ld
+
+: mktrampolines-dietlibc OK.

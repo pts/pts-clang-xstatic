@@ -29,15 +29,11 @@
 #undef HAVE_REALLOC
 
 #ifdef __XTINY__
-#ifndef __XTINY_FORWARD_MALLOC__
-#define __XTINY_FORWARD_MALLOC__ 1200000000  /* Almost 1.2 GB. */
-extern char __forward_malloc_heap[];
-char *__forward_malloc_heap_end =
-    __forward_malloc_heap + __XTINY_FORWARD_MALLOC__;
-#endif
 #include <xtiny.h>
 #else  /* not __XTINY__ */
+#ifndef __MINIDIET__
 #define HAVE_REALLOC 1
+#endif
 #ifdef USE_MINIINC
 #include <miniinc.h>
 #else
