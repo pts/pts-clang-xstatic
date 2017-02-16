@@ -23,7 +23,6 @@ type perl
 #type python  # Needed for ./mklibs.
 type sha1sum
 type ErmineLight.i386
-test -f mklibs
 
 SHA1="$(sha1sum <"$IN")"
 # /tmp/clang+llvm-3.3-i386-debian6/bin/clang
@@ -43,6 +42,36 @@ case "$SHA1" in
  'f5710755488345cee92a31b7d1e20d58055f9a60  -')  # clang+llvm-3.4-i686-fedora19/bin/clang
   INLIB=inlib34
   ;;
+ 'da63d1fcfbdc3cd8d3238b017f81ea9bc0f12f92  -')
+  # http://releases.llvm.org/3.4.2/clang+llvm-3.4.2-i586-opensuse13.1.xz
+  # tar xJvf clang+llvm-3.4.2-i586-opensuse13.1.xz clang+llvm-3.4.2-i586-opensuse13.1/bin/clang
+  INLIB=inlib34
+  ;;
+ 'daaf6da5f37bf619d8bdb1dfc7115facf5ad132c  -')
+  # http://releases.llvm.org/3.5.1/clang+llvm-3.5.1-i586-opensuse13.1.tar.xz
+  # tar xJvf clang+llvm-3.5.1-i586-opensuse13.1.tar.xz clang+llvm-3.5.1-i586-opensuse13.1/bin/clang
+  INLIB=inlib35
+  ;;
+ '91737354f8ff7ea519746d0bb0def6188310d894  -')
+  # http://releases.llvm.org/3.6.2/clang+llvm-3.6.2-i586-opensuse13.2.tar.xz
+  # tar xJvf clang+llvm-3.6.2-i586-opensuse13.2.tar.xz clang+llvm-3.6.2-i586-opensuse13.2/bin/clang
+  INLIB=inlib35
+  ;;
+ '542cebbb27b7a26521b375bd54d58bfa6c84171f  -')
+  # http://releases.llvm.org/3.7.1/clang+llvm-3.7.1-i586-opensuse13.2.tar.xz
+  # tar xJvf clang+llvm-3.7.1-i586-opensuse13.2.tar.xz clang+llvm-3.7.1-i586-opensuse13.2/bin/clang-3.7
+  INLIB=inlib35
+  ;;
+ '824db05f5d4473187c626722fe07574ebdc9ccc2  -')
+  # http://releases.llvm.org/3.8.1/clang+llvm-3.8.1-i586-opensuse13.2.tar.xz
+  # tar xJvf clang+llvm-3.8.1-i586-opensuse13.2.tar.xz clang+llvm-3.8.1-i586-opensuse13.2/bin/clang-3.8
+  INLIB=inlib35
+  ;;
+ '6a958f09d206cfed77edfcfcfe9f4ea45707a324  -')
+  # http://releases.llvm.org/3.9.0/clang+llvm-3.9.0-i586-opensuse13.2.tar.xz
+  # tar xJvf clang+llvm-3.9.0-i586-opensuse13.2.tar.xz clang+llvm-3.9.0-i586-opensuse13.2/bin/clang-3.9
+  INLIB=inlib35
+  ;;
  *) echo "unknown clang binary"; exit 1
 esac
 
@@ -50,40 +79,35 @@ test -f "$INLIB".sfx.7z
 test -x "$INLIB".sfx.7z
 rm -rf inlib "$INLIB"
 # Created with: rm -f inlib33.sfx.7z && time 7z a -t7z -mx=7 -md=8m -ms=on -sfx../../../../../../../../../../"$PWD"/7z9.22LinuxI386ConTiny.sfx inlib33.sfx.7z inlib33 && chmod 755 inlib33.sfx.7z
+# Created with: rm -f inlib35.sfz.7z && time 7z a -t7z -mx=7 -ms=50m       -sfx../../../../../../../../../../home/pts/prg/tiny7zx inlib35.sfx.7z inlib35 && chmod 755 inlib35.sfx.7z
 ./"$INLIB".sfx.7z -y
 #cp -a "$INLIB" inlib
 mv "$INLIB" inlib
 test -f inlib/libc.so.6
-test -f inlib/libc_pic.a
-test -f inlib/libc_pic.map
-test -f inlib/soinit.o
-test -f inlib/sofini.o
 
 rm -f "$OUT.tmp1"
 <"$IN" >"$OUT.tmp1" cat
+strip -s "$OUT.tmp1"
 #<"$IN" >"$OUT.tmp1" perl -0777 \
 #    -pe'die if !s@\0/proc/self/exe\0@\0/proc/self/exE\0@'
-#patchelf --set-rpath '$ORIGIN/inlib' "$OUT.tmp1"
-#patchelf --set-rpath '$ORIGIN/destlib' "$OUT.tmp1"
 patchelf --set-rpath '' "$OUT.tmp1"
-#patchelf --set-interpreter /lib/ld-linux.so.2 "$OUT.tmp1"
-#patchelf  --set-interpreter destlib/interpretr "$OUT.tmp1"
 INTERP="/tmp/i$$"  # Ermine needs absolute path. We use short path for patchelf.
 patchelf --set-interpreter "$INTERP" "$OUT.tmp1"
 cp -a inlib/ld-linux.so.2 "$INTERP"
 chmod +x "$OUT.tmp1"
 rm -rf destlib
 mkdir destlib
-# SUXX: memcpy and about 54 functions are supplied as `i' (implicit) relocations, which mklibs does not support
-./mklibs --sysroot ./ -D -L inlib -d destlib --ldlib inlib/ld-linux.so.2 clang.bin.tmp1
-# Alternative to mklibs: cp -a inlib/* destlib/
+cp -a inlib/* destlib/
 # If the --set-interpereter value was not an absolute path, Ermine wouldn't
 # embed it.
-ErmineLight.i386 -l destlib -o "$OUT".tmp2 "$OUT".tmp1
+ErmineLight.i386 -l destlib -o "$OUT".tmp2 "$OUT".tmp1 2>"$OUT.ermerr" >&2
+cat "$OUT.ermerr" >&2
+test -s "$OUT.ermerr" && exit 1
 # To get argv[0] right. Otherwise Clang reads it from /proc/self/exe.
 <"$OUT.tmp2" >"$OUT" perl -0777 \
     -pe'die if !s@\0/proc/self/exe\0@\0/proc/self/exE\0@'
 chmod 755 "$OUT"
 rm -rf inlib destlib "$OUT.tmp1" "$OUT.tmp2"
 ls -l "$OUT"
+# TODO(pts): Check "$OUT" with strace that it doesn't open other binary files.
 : mkclangbin OK.
