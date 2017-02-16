@@ -24,6 +24,7 @@ CFLAGS='-isystem minidiet -isysroot minidiet -m32 -s -Os -static -s -fno-stack-p
 CFLAGSEND='-nostdlib -nostartfiles minidiet/_start.o minidiet/lib0.a'
 
 # TODO(pts): Why are the executable sizes different with mktrampolones-minidiet, mktrampolines-xtiny and -mxtiny-linker-script ? Different version of linker?
+# TODO(pts): Why does gcc-4.8.4 (even with -fno-builtins) produce larger code than gcc-4.4.3 for these binaries?
 gcc $CFLAGS -o xstatic xstatic.c $CFLAGSEND
 gcc $CFLAGS -o clang clang_trampoline.c $CFLAGSEND
 gcc $CFLAGS -o clang_ld clang_ld.c $CFLAGSEND
