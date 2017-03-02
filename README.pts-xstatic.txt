@@ -6,6 +6,9 @@ Linux i386 and Linux x86_64 host systems. It wraps an existing compiler (GCC
 or Clang) of your choice, and it links against uClibc and the other base
 libraries included in the pts-xstatic binary release.
 
+Send donations to the author of pts-xstatic:
+https://flattr.com/submit/auto?user_id=pts&url=https://github.com/pts/pts-clang-xstatic
+
 See also pts-xdiet
 (http://raw.github.com/pts/pts-clang-xstatic/master/README.pts-xdiet.txt)
 which is similar to pts-xstatic, but it works with diet libc rather then

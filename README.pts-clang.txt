@@ -11,6 +11,9 @@ Get the newest version of this document from here:
 
   http://raw.github.com/pts/pts-clang-xstatic/master/README.pts-clang.txt
 
+Send donations to the author of pts-clang:
+https://flattr.com/submit/auto?user_id=pts&url=https://github.com/pts/pts-clang-xstatic
+
 About Clang
 ~~~~~~~~~~~
 The clang command-line tool of Clang contains a C compiler, a C++ compiler,
