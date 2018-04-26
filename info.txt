@@ -86,6 +86,8 @@ Developer info:
   $ gcc -dumpspecs > specfile
   $ $ sed -i 's/hash-style=gnu/hash-style=both/' specfile
   $ $ gcc -specs=specfile hello.c
+* Use mktrampolines-xtiny, it creates smaller executables than the default
+  mktrampolines-minidiet.
 
 TODOs for new features:
 

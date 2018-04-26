@@ -16,9 +16,9 @@ uClibc. The executables compiled by pts-xdiet tend to be smaller than those
 by pts-xstatic. Stay tuned for more info about execution speed and
 compatibility (e.g. C++ and libraries) differences.
 
-C compilers supported: gcc-4.1 ... gcc-4.8, clang-3.0 ... clang-3.3.
-(gcc-6 and gcc-7 don't work yet, a fix is on the way.) C++
-compilers supported: g++ and clang++ corresponding to the supported C
+C compilers supported: gcc-4.1 ... gcc-4.8 ... gcc-6.4 ... gcc-7.3,
+clang-3.0 ... clang-3.3.
+C++ compilers supported: g++ and clang++ corresponding to the supported C
 compilers. Compatible uClibc C and C++ headers (.h) and precompiled static
 libraries (e.g. libc.a, libz.a, libstdc++.a) are also provided by
 pts-xstatic. To minimize system dependencies, pts-xstatic can compile

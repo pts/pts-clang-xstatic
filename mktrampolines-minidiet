@@ -31,4 +31,4 @@ gcc $CFLAGS -o clang_ld clang_ld.c $CFLAGSEND
 
 ls -l xstatic clang clang_ld
 
-: mktrampolines-dietlibc OK.
+: mktrampolines-minidiet OK.

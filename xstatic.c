@@ -602,6 +602,70 @@ static char *get_up_dir_alloc(const char *dir) {
   return dirup;
 }
 
+/* Read everything from file descriptor fd, find "!fno-use-linker-plugin:",
+ * return bool indicating whether found
+ */
+static char does_contain_linker_plugin(int fd) {
+  char const kHaystack[] = "fno-use-linker-plugin:";
+  char buf[4096], *p = buf, *pend;
+  int got;
+  struct __StaticAssertBufSize {
+    int StaticAssertBufSize : sizeof(buf) >= sizeof(kHaystack);
+  };
+  while ((got = read(fd, p, sizeof(buf) - (p - buf))) > 0) {
+    pend = p + got;
+    p = buf;
+    while (p != pend) {
+      if (*p++ != '!') continue;
+      if (pend - p + 0U >= (sizeof(kHaystack) - 1) && 0 == memcmp(p, kHaystack, (sizeof(kHaystack) - 1))) {
+        /* Read and discard the rest of the input on fd. */
+        while ((got = read(fd, buf, sizeof(buf))) > 0) {}
+        return 1;  /* Found. */
+      }
+    }
+    if (p - buf + 0U > (sizeof(kHaystack) - 1)) {
+      /* Move the end of the buffer to the beginning for more matches. */
+      for (pend = p - (sizeof(kHaystack) - 1), p = buf; p != buf + (sizeof(kHaystack) - 1); *p++ = *pend++) {}
+    }
+  }
+  return 0;  /* Not found. */
+}
+
+static char does_gcc_support_linker_plugin(const char *gcc_prog) {
+  char result;
+  pid_t pid;
+  int p[2], status;
+  if (0 != pipe(p)) {
+    fdprint(2, "xstatic: error: pipe failed\n");
+    exit(122);
+  }
+  if ((pid = fork()) == 0) {  /* Child process. */
+    char *args[3];
+    close(p[0]);
+    if (p[1] != 1) {
+      dup2(p[1], 1);  /* Redirect gcc's stdout so our parent can read it. */
+      close(p[1]);
+    }
+    args[0] = (char*)gcc_prog;
+    args[1] = "-dumpspecs";
+    args[2] = 0;
+    execve(gcc_prog, args, environ);
+    exit(124);
+  }
+  if (pid < 0) {
+    fdprint(2, "xstatic: error: fork failed\n");
+    exit(122);
+  }
+  close(p[1]);
+  result = does_contain_linker_plugin(p[0]);
+  close(p[0]);
+  if (pid != waitpid(pid, &status, 0) || status != 0) {
+    fdprint(2, strdupcat("xstatic: error: detection failed: ", gcc_prog, " -dumpspecs\n"));
+    exit(122);
+  }
+  return result;
+}
+
 typedef enum ldmode_t {
   LM_XCLANGLD = 0,  /* Use the ld and -lgcc shipped with clang. */
   LM_XSYSLD = 1,
@@ -751,6 +815,8 @@ int main(int argc, char **argv) {
         "xstatic: error: file missing, please install: ", p, "\n"));
     return 123;
   }
+  p = strdupcat(dirup, "/xstaticcld/as", "");
+  if (0 != stat(p, &st) || !S_ISREG(st.st_mode)) goto file_missing;
   p = strdupcat(dirup, "/xstaticusr/lib/libc.a", "");
   if (0 != stat(p, &st) || !S_ISREG(st.st_mode)) goto file_missing;
   p = strdupcat(dirup, "/xstaticusr/include/stdio.h", "");
@@ -768,8 +834,9 @@ int main(int argc, char **argv) {
   argv[1] = argv[0];
   ++argv;
   --argc;
-  argp = args = malloc(sizeof(*args) * (argc + 20));
+  argp = args = malloc(sizeof(*args) * (argc + 21));
   *argp++ = prog;  /* Set destination argv[0]. */
+  
   /* No need to check for -m64, check_bflags has already done that. */
   if (!argv[1] ||
       (!argv[2] &&
@@ -884,6 +951,13 @@ int main(int argc, char **argv) {
     if (need_linker) {
       *argp++ = "-Wl,--do-xstaticcld";
       if (is_verbose) *argp++ = "-Wl,--do-xstaticldv";
+      /* The default -fuse-linker-plugin breaks our ld with gcc-6.4 and
+       * gcc-7.3, so we have to specify -fno-use-linker-plugin. But older
+       * gcc-4.4 doesn't support it and fails.
+       */
+      if (does_gcc_support_linker_plugin(prog)) {
+        *argp++ = "-fno-use-linker-plugin";
+      }
     }
     *argp++ = NULL;
   }
