@@ -70,9 +70,9 @@ Developer info:
   for `../xstatic ../clang++ ~/prg/hello.cc'. Good.
 * Binary release archives were created with:
 
-  $ rm -f pts-clang-latest.sfx.7z && time 7z a -t7z -mx=7 -md=8m -ms=on -sfx../../../../../../../../"$PWD"/7z9.22LinuxI386ConTiny.sfx pts-clang-latest.sfx.7z pts-clang
-  $ rm -f pts-xstatic-latest.sfx.7z && time 7z a -t7z -mx=7 -md=8m -ms=on -sfx../../../../../../../../"$PWD"/7z9.22LinuxI386ConTiny.sfx pts-xstatic-latest.sfx.7z pts-xstatic
-  $ rm -f pts-static-binu-latest.sfx.7z && time 7z a -t7z -mx=7 -md=8m -ms=on -sfx../../../../../../../../"$PWD"/7z9.22LinuxI386ConTiny.sfx pts-static-binu-latest.sfx.7z pts-static-binu
+  $ rm -f pts-clang-latest.sfx.7z && time 7z a -t7z -mx=7 -md=8m -ms=on -sfx../../../../../../../../"$HOME"/prg/pts-tiny-7z-sfx/tiny7zx pts-clang-latest.sfx.7z pts-clang
+  $ rm -f pts-xstatic-latest.sfx.7z && time 7z a -t7z -mx=7 -md=8m -ms=on -sfx../../../../../../../../"$HOME"/prg/pts-tiny-7z-sfx/tiny7zx pts-xstatic-latest.sfx.7z pts-xstatic
+  $ rm -f pts-static-binu-latest.sfx.7z && time 7z a -t7z -mx=7 -md=8m -ms=on -sfx../../../../../../../../"$HOME"/prg/pts-tiny-7z-sfx/tiny7zx pts-static-binu-latest.sfx.7z pts-static-binu
   $ chmod 755 *.sfz.7z
 
 * `diet' needs explicit -m32.
